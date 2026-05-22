@@ -8,18 +8,23 @@ const props = defineProps<{
     duration: string;
     color: string;
   }>;
-  currentTrackIndex: number;
+  activeTrackIndex: number;
   playlistName: string;
 }>();
 
-const { tracks, currentTrackIndex, playlistName } = props;
+const { tracks, activeTrackIndex, playlistName } = props;
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
+  (event: "play", index: number): void;
 }>();
 
 function selectTrack(index: number) {
   emit("select", index);
+}
+
+function playTrack(index: number) {
+  emit("play", index);
 }
 </script>
 
@@ -43,8 +48,9 @@ function selectTrack(index: number) {
       <li
         v-for="(track, index) in tracks"
         :key="track.id"
-        :class="{ active: index === currentTrackIndex }"
+        :class="{ active: index === activeTrackIndex }"
         @click="selectTrack(index)"
+        @dblclick="playTrack(index)"
       >
         <span class="row-index">{{ index + 1 }}</span>
         <div class="track-item">
@@ -145,7 +151,7 @@ function selectTrack(index: number) {
   margin: 0;
   padding: 0 0.9rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 0.2rem;
 }
 
 .track-list li {
@@ -155,7 +161,7 @@ function selectTrack(index: number) {
   gap: 0.75rem;
   padding: 0.3rem 0;
   border-radius: 0.9rem;
-  cursor: pointer;
+  cursor: default;
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
@@ -170,7 +176,7 @@ function selectTrack(index: number) {
 
 .row-index {
   color: #6b7280;
-  font-weight: 700;
+  font-weight: 300;
   text-align: center;
 }
 
@@ -181,6 +187,7 @@ function selectTrack(index: number) {
   border-radius: 0.9rem;
   padding: 0.65rem 0.9rem;
   min-width: 0;
+  font-size: 0.92rem;
 }
 
 .cover-preview {
@@ -204,7 +211,9 @@ function selectTrack(index: number) {
 }
 
 .row-artist {
-  color: #384151;
+  color: #7b8391;
+  font-size: 0.86rem;
+  font-weight: 350;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -212,7 +221,8 @@ function selectTrack(index: number) {
 }
 
 .duration {
-  color: #6b6b6b;
+  color: #8a8a8a;
+  font-size:0.86rem;
   font-weight: 400;
   text-align: left;
 }

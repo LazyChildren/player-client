@@ -46,6 +46,7 @@ const tracks = ref<Track[]>([
 ]);
 
 const currentTrackIndex = ref(0);
+const activeTrackIndex = ref(0);
 const currentPlaylistName = ref("默认收藏夹");
 const isPlaying = ref(false);
 const currentTime = ref(0);
@@ -81,13 +82,20 @@ function playPause() {
 
 function prevTrack() {
   currentTrackIndex.value = (currentTrackIndex.value - 1 + tracks.value.length) % tracks.value.length;
+  activeTrackIndex.value = currentTrackIndex.value;
 }
 
 function nextTrack() {
   currentTrackIndex.value = (currentTrackIndex.value + 1) % tracks.value.length;
+  activeTrackIndex.value = currentTrackIndex.value;
 }
 
 function selectTrack(index: number) {
+  activeTrackIndex.value = index;
+}
+
+function playTrack(index: number) {
+  activeTrackIndex.value = index;
   currentTrackIndex.value = index;
   isPlaying.value = true;
 }
@@ -147,9 +155,10 @@ onUnmounted(() => {
         <main class="main-panel">
           <PlaylistView
             :tracks="tracks"
-            :currentTrackIndex="currentTrackIndex"
+            :activeTrackIndex="activeTrackIndex"
             :playlistName="currentPlaylistName"
             @select="selectTrack"
+            @play="playTrack"
           />
           <PlayerFooter
             :currentTrack="currentTrack"
