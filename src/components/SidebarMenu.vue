@@ -1,14 +1,5 @@
-<template>
+﻿<template>
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <p class="eyebrow">本地音乐</p>
-    </div>
-
-    <div class="search-wrapper">
-      <input type="search" placeholder="查找音乐..." class="search-input" />
-    </div>
-
-
     <div class="playlist-group">
       <p class="eyebrow">收藏夹</p>
       <button class="playlist-item active">默认收藏夹</button>
@@ -39,26 +30,6 @@
   letter-spacing: 0.2em;
   color: #6366f1;
 }
-.search-wrapper {
-  display: flex;
-}
-.search-input {
-  width: 100%;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 9999px;
-  padding: 0.9rem 1rem;
-  background: rgba(247, 250, 252, 0.95);
-  color: #374151;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: rgba(99, 102, 241, 0.35);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
-  background: rgba(255, 255, 255, 1);
-}
-
 .playlist-group {
   display: flex;
   flex-direction: column;

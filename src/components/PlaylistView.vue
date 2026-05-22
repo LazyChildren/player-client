@@ -1,5 +1,4 @@
-<script setup lang="ts">
-
+﻿<script setup lang="ts">
 const props = defineProps<{
   tracks: Array<{
     id: number;
@@ -10,9 +9,10 @@ const props = defineProps<{
     color: string;
   }>;
   currentTrackIndex: number;
+  playlistName: string;
 }>();
 
-const { tracks, currentTrackIndex } = props;
+const { tracks, currentTrackIndex, playlistName } = props;
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
@@ -27,9 +27,16 @@ function selectTrack(index: number) {
   <section class="playlist-panel">
     <div class="playlist-header">
       <div>
-        <h2>全部歌曲</h2>
+        <p class="playlist-title">{{ playlistName }}</p>
       </div>
       <span class="playlist-count">{{ tracks.length }} 首</span>
+    </div>
+
+    <div class="track-table-header">
+      <span class="col-index">序号</span>
+      <span class="col-title">标题</span>
+      <span class="col-artist">艺术家</span>
+      <span class="col-duration">时长</span>
     </div>
 
     <ul class="track-list">
@@ -39,13 +46,14 @@ function selectTrack(index: number) {
         :class="{ active: index === currentTrackIndex }"
         @click="selectTrack(index)"
       >
+        <span class="row-index">{{ index + 1 }}</span>
         <div class="track-item">
           <div class="cover-preview" :style="{ background: track.color }"></div>
           <div class="track-meta">
             <p class="track-title">{{ track.title }}</p>
-            <p class="track-subtitle">{{ track.artist }} · {{ track.album }}</p>
           </div>
         </div>
+        <span class="row-artist">{{ track.artist }}</span>
         <span class="duration">{{ track.duration }}</span>
       </li>
     </ul>
@@ -65,7 +73,6 @@ function selectTrack(index: number) {
   overflow-x: hidden;
 }
 
-/* 自定义滚动条 - Webkit浏览器 */
 .playlist-panel::-webkit-scrollbar {
   width: 10px;
 }
@@ -89,73 +96,124 @@ function selectTrack(index: number) {
   display: none;
 }
 
-/* Firefox滚动条样式 */
 .playlist-panel {
   scrollbar-color: rgba(99, 102, 241, 0.4) rgba(245, 246, 251, 0.5);
   scrollbar-width: thin;
 }
+
 .playlist-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
-.playlist-header h2 {
+
+.playlist-title {
   margin: 0;
   font-size: 1.55rem;
+  font-weight: 700;
+  color: #374151;
 }
+
 .playlist-count {
   color: #6b7280;
   font-weight: 700;
 }
+
+.track-table-header {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.9rem 0.35rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  color: #6b7280;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.col-index {
+  text-align: center;
+}
+
+.col-title {
+  padding-left: 4.85rem;
+}
+
 .track-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.9rem;
   display: grid;
   gap: 0.85rem;
 }
+
 .track-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.95rem 1rem;
-  border-radius: 0;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-radius: 0.9rem;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease;
 }
+
 .track-list li:hover {
   background: rgba(99, 102, 241, 0.08);
   transform: translateY(-1px);
 }
+
 .track-list li.active {
   background: rgba(79, 70, 229, 0.12);
 }
+
+.row-index {
+  color: #6b7280;
+  font-weight: 700;
+  text-align: center;
+}
+
 .track-item {
   display: flex;
   align-items: center;
   gap: 0.95rem;
+  border-radius: 0.9rem;
+  padding: 0.65rem 0.9rem;
+  min-width: 0;
 }
+
 .cover-preview {
   width: 3rem;
   height: 3rem;
   border-radius: 0;
 }
+
 .track-meta {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
+
 .track-title {
   margin: 0;
-  font-weight: 700;
+  font-weight: 350;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.track-subtitle {
-  margin: 0.25rem 0 0;
-  color: #6b7280;
-  font-size: 0.95rem;
+
+.row-artist {
+  color: #384151;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .duration {
-  color: #4b5563;
-  font-weight: 700;
+  color: #6b6b6b;
+  font-weight: 400;
+  text-align: left;
 }
 </style>

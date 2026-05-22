@@ -46,6 +46,7 @@ const tracks = ref<Track[]>([
 ]);
 
 const currentTrackIndex = ref(0);
+const currentPlaylistName = ref("默认收藏夹");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -132,8 +133,13 @@ onUnmounted(() => {
   <div class="app-shell">
     <div class="app-content">
       <div class="titlebar">
-        <div></div>
-        <WindowControls />
+        <div class="titlebar-left"></div>
+        <div class="titlebar-center">
+          <input type="search" placeholder="查找音乐..." class="titlebar-search-input" />
+        </div>
+        <div class="titlebar-right">
+          <WindowControls />
+        </div>
       </div>
 
       <div class="content-grid">
@@ -142,6 +148,7 @@ onUnmounted(() => {
           <PlaylistView
             :tracks="tracks"
             :currentTrackIndex="currentTrackIndex"
+            :playlistName="currentPlaylistName"
             @select="selectTrack"
           />
           <PlayerFooter
@@ -183,11 +190,11 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 1.2rem 0 0 0;
+  padding: 0.5rem 0rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 0.5rem;
   overflow: hidden;
 }
 
@@ -211,16 +218,129 @@ onUnmounted(() => {
 .titlebar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0.65rem 1rem;
+  justify-content: space-between;
+  padding: 0.2rem 1rem 0.35rem;
   background: transparent;
   border: none;
   -webkit-app-region: drag;
+  gap: 0;
 }
 
-.titlebar > div:first-child {
-  flex: 1;
+.titlebar-left {
+  width: 260px;
+  flex: 0 0 260px;
   -webkit-app-region: drag;
+}
+
+.titlebar-center {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  -webkit-app-region: drag;
+}
+
+.titlebar-right {
+  width: 6.3rem;
+  flex: 0 0 6.3rem;
+  display: flex;
+  justify-content: flex-end;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-search-input {
+  width: min(460px, 100%);
+  max-width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 9999px;
+  padding: 0.48rem 0.9rem;
+  background: rgba(247, 250, 252, 0.95);
+  color: #374151;
+  -webkit-app-region: no-drag;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.titlebar-search-input:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+  background: rgba(255, 255, 255, 1);
+}
+
+@media (max-width: 1024px) {
+  .titlebar-left {
+    display: none;
+  }
+
+  .titlebar-right {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .titlebar-search-input {
+    width: min(420px, 100%);
+  }
+}
+
+@media (max-width: 720px) {
+  .titlebar {
+    padding: 0.2rem 0.6rem 0.35rem;
+    gap: 0.5rem;
+  }
+
+  .titlebar-center {
+    justify-content: flex-start;
+  }
+
+  .titlebar-search-input {
+    width: 100%;
+  }
+
+  .titlebar-right {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .titlebar-center {
+    min-width: 0;
+  }
+
+  .titlebar-search-input {
+    min-width: 0;
+    padding: 0.42rem 0.78rem;
+  }
+
+  .titlebar-right {
+    width: auto;
+  }
+}
+
+@media (max-width: 430px) {
+  .titlebar {
+    flex-wrap: wrap;
+  }
+
+  .titlebar-center,
+  .titlebar-right {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .titlebar-right {
+    justify-content: flex-end;
+  }
+
+  .titlebar-center {
+    order: 1;
+  }
+
+  .titlebar-right {
+    order: 2;
+  }
+
+  .titlebar-search-input {
+    width: 100%;
+  }
 }
 
 

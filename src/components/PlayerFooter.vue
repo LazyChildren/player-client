@@ -103,7 +103,7 @@ function formatTime(seconds: number) {
   box-sizing: border-box;
   border-radius: 0;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.08);
 
   padding: 0.5rem 1rem 0.75rem;
   display: grid;

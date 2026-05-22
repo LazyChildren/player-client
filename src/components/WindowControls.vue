@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { getCurrentWindow, type Window as TauriWindow } from "@tauri-apps/api/window";
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 const isMaximized = ref(false);
 let windowHandle: TauriWindow | null = null;
+let unlistenWindowEvents: Array<() => void> = [];
 
 async function ensureWindowHandle() {
   if (windowHandle) {
@@ -35,6 +36,25 @@ onMounted(async () => {
   }
 
   await refreshMaximizeState();
+
+  if (!windowHandle) return;
+
+  const unlistenResized = await windowHandle.onResized(async () => {
+    await refreshMaximizeState();
+  });
+
+  const unlistenMoved = await windowHandle.onMoved(async () => {
+    await refreshMaximizeState();
+  });
+
+  unlistenWindowEvents = [unlistenResized, unlistenMoved];
+});
+
+onUnmounted(() => {
+  for (const unlisten of unlistenWindowEvents) {
+    unlisten();
+  }
+  unlistenWindowEvents = [];
 });
 
 async function minimize() {
@@ -109,12 +129,9 @@ async function closeWindow() {
 
 <style scoped>
 .window-controls {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: flex;
   gap: 0;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
   padding: 0;
   margin: 0;
@@ -123,30 +140,29 @@ async function closeWindow() {
 }
 .window-button {
   all: unset;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.1rem;
+  height: 2.1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 0;
   background: transparent;
-  color: inherit;
+  color: rgba(31, 41, 55, 0.5);
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.18s ease, color 0.18s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
   -webkit-app-region: no-drag;
 }
 .window-button:hover {
-  background: rgba(0, 0, 0, 0.08);
+  color: rgba(17, 24, 39, 0.92);
   transform: translateY(-1px);
 }
 .window-button svg {
   display: block;
 }
 .close-button {
-  color: inherit;
+  color: rgba(239, 68, 68, 0.55);
 }
 .close-button:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
+  color: rgba(185, 28, 28, 0.95);
 }
 </style>
