@@ -127,9 +127,9 @@ function selectTrack(index: number) {
   gap: 0.75rem;
   padding: 0 0.9rem 0.35rem;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  color: #6b7280;
+  color: #8e95a1;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .col-index {
