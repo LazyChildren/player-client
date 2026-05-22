@@ -104,7 +104,7 @@ function formatTime(seconds: number) {
   border-radius: 0;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.08);
+
   padding: 0.5rem 1rem 0.75rem;
   display: grid;
   gap: 0.5rem;
@@ -132,7 +132,6 @@ function formatTime(seconds: number) {
   height: 2.5rem;
   border-radius: 0;
   background: rgba(255, 255, 255, 0.45);
-  box-shadow: inset 0 10px 20px rgba(0, 0, 0, 0.05);
 }
 .player-meta h2 {
   margin: 0.2rem 0 0.1rem;

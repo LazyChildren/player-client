@@ -27,7 +27,6 @@ function selectTrack(index: number) {
   <section class="playlist-panel">
     <div class="playlist-header">
       <div>
-        <p class="eyebrow">Music List</p>
         <h2>全部歌曲</h2>
       </div>
       <span class="playlist-count">{{ tracks.length }} 首</span>
@@ -57,8 +56,6 @@ function selectTrack(index: number) {
 .playlist-panel {
   background: rgba(255, 255, 255, 0.88);
   border-radius: 0;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
   padding: 1.6rem;
   display: flex;
   flex-direction: column;
@@ -143,7 +140,6 @@ function selectTrack(index: number) {
   width: 3rem;
   height: 3rem;
   border-radius: 0;
-  box-shadow: inset 0 12px 20px rgba(0, 0, 0, 0.06);
 }
 .track-meta {
   display: flex;

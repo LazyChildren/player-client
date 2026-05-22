@@ -2,21 +2,16 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <p class="eyebrow">本地音乐</p>
-      <h2>Library</h2>
     </div>
 
     <div class="search-wrapper">
-      <input type="search" placeholder="Search local songs..." class="search-input" />
+      <input type="search" placeholder="查找音乐..." class="search-input" />
     </div>
 
-    <nav class="menu-list">
-      <button class="menu-item active">歌单</button>
-      <button class="menu-item">设置</button>
-    </nav>
 
     <div class="playlist-group">
-      <p class="group-label">PLAYLISTS</p>
-      <button class="playlist-item active">Good</button>
+      <p class="eyebrow">收藏夹</p>
+      <button class="playlist-item active">默认收藏夹</button>
     </div>
   </aside>
 </template>
@@ -26,12 +21,13 @@
   width: 260px;
   padding: 1.5rem;
   border-radius: 0;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+  background: rgba(128, 128, 128, 0.01);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-height: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
 .sidebar-header h2 {
   margin: 0.35rem 0 0;
@@ -49,17 +45,26 @@
 .search-input {
   width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 0;
+  border-radius: 9999px;
   padding: 0.9rem 1rem;
-  background: rgba(243, 244, 246, 0.9);
-  color: #111827;
+  background: rgba(247, 250, 252, 0.95);
+  color: #374151;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
-.menu-list,
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+  background: rgba(255, 255, 255, 1);
+}
+
 .playlist-group {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
+
 .menu-item,
 .playlist-item {
   all: unset;
@@ -68,8 +73,13 @@
   border-radius: 0;
   background: rgba(247, 250, 252, 0.9);
   color: #111827;
-  font-weight: 600;
+  font-weight: 400;
   transition: background 0.2s ease;
+  font-size: 0.75rem;
+}
+
+.playlist-item {
+  border-radius: 0.75rem;
 }
 .menu-item:hover,
 .playlist-item:hover {
@@ -78,7 +88,7 @@
 .menu-item.active,
 .playlist-item.active {
   background: rgba(79, 70, 229, 0.1);
-  color: #3730a3;
+  color: #726ae6;
 }
 .group-label {
   margin: 0;

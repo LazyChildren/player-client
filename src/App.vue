@@ -177,19 +177,35 @@ onUnmounted(() => {
     radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.00), transparent 0%),
     #f5f6fb;
   background-clip: padding-box;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
 }
 
 .app-content {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 1.2rem 1.2rem 8rem;
+  padding: 1.2rem 0 0 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
   overflow: hidden;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  padding-bottom: 0;
 }
 
 .titlebar {
@@ -207,17 +223,6 @@ onUnmounted(() => {
   -webkit-app-region: drag;
 }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 1.2rem;
-}
-
-.main-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
 
 @media (max-width: 1024px) {
   .content-grid {
