@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import PlayingIndicator from "./PlayingIndicator.vue";
 
 const props = defineProps<{
@@ -16,7 +16,6 @@ const props = defineProps<{
   playlistName: string;
 }>();
 
-const { tracks, activeTrackIndex, currentTrackIndex, isPlaying, playlistName } = props;
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
@@ -36,9 +35,9 @@ function playTrack(index: number) {
   <section class="playlist-panel">
     <div class="playlist-header">
       <div>
-        <p class="playlist-title">{{ playlistName }}</p>
+        <p class="playlist-title">{{ props.playlistName }}</p>
       </div>
-      <span class="playlist-count">{{ tracks.length }} 首</span>
+      <span class="playlist-count">{{ props.tracks.length }} 首</span>
     </div>
 
     <div class="track-table-header">
@@ -50,14 +49,14 @@ function playTrack(index: number) {
 
     <ul class="track-list">
       <li
-        v-for="(track, index) in tracks"
+        v-for="(track, index) in props.tracks"
         :key="track.id"
-        :class="{ active: index === activeTrackIndex }"
+        :class="{ active: index === props.activeTrackIndex }"
         @click="selectTrack(index)"
         @dblclick="playTrack(index)"
       >
         <span class="row-index">
-          <PlayingIndicator v-if="isPlaying && index === currentTrackIndex" :autoplay="true" />
+          <PlayingIndicator v-if="props.isPlaying && index === props.currentTrackIndex" :autoplay="true" />
           <template v-else>{{ index + 1 }}</template>
         </span>
         <div class="track-item">
@@ -238,3 +237,4 @@ function playTrack(index: number) {
   text-align: left;
 }
 </style>
+

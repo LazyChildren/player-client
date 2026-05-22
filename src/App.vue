@@ -156,6 +156,8 @@ onUnmounted(() => {
           <PlaylistView
             :tracks="tracks"
             :activeTrackIndex="activeTrackIndex"
+            :currentTrackIndex="currentTrackIndex"
+            :isPlaying="isPlaying"
             :playlistName="currentPlaylistName"
             @select="selectTrack"
             @play="playTrack"
