@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PlayingIndicator from "./PlayingIndicator.vue";
 import type { Track } from "../types/music";
 
 const props = defineProps<{
@@ -84,7 +83,22 @@ function refreshPlaylist() {
         @dblclick="playTrack(index)"
       >
         <span class="row-index">
-          <PlayingIndicator v-if="props.isPlaying && index === props.currentTrackIndex" :autoplay="true" />
+          <span v-if="props.isPlaying && index === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
+            <svg
+              t="1779702244479"
+              class="icon playing-bars-icon"
+              viewBox="0 0 1024 1024"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              p-id="21004"
+            >
+              <rect class="playing-bar bar-1" x="682.666667" y="298.666667" width="42.666666" height="469.333333" />
+              <rect class="playing-bar bar-2" x="341.333333" y="298.666667" width="42.666667" height="469.333333" />
+              <rect class="playing-bar bar-3" x="170.666667" y="426.666667" width="42.666666" height="213.333333" />
+              <rect class="playing-bar bar-4" x="853.333333" y="426.666667" width="42.666667" height="213.333333" />
+              <rect class="playing-bar bar-5" x="512" y="170.666667" width="42.666667" height="725.333333" />
+            </svg>
+          </span>
           <template v-else>{{ index + 1 }}</template>
         </span>
         <div class="track-item">
@@ -280,6 +294,48 @@ function refreshPlaylist() {
   min-height: 16px;
 }
 
+.playing-bars {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+}
+
+.playing-bars-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.playing-bar {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: playing-bars-wave 1s ease-in-out infinite;
+}
+
+.bar-1 {
+  animation-delay: -0.1s;
+}
+
+.bar-2 {
+  animation-delay: -0.35s;
+}
+
+.bar-3 {
+  animation-delay: -0.6s;
+}
+
+.bar-4 {
+  animation-delay: -0.2s;
+}
+
+.bar-5 {
+  animation-delay: -0.45s;
+}
+
 .track-item {
   display: flex;
   align-items: center;
@@ -332,6 +388,24 @@ function refreshPlaylist() {
 @keyframes playlist-refresh-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes playing-bars-wave {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scaleY(0.45);
+  }
+
+  35% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  70% {
+    opacity: 0.72;
+    transform: scaleY(0.62);
   }
 }
 </style>
