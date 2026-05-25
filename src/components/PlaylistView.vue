@@ -1,21 +1,16 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import PlayingIndicator from "./PlayingIndicator.vue";
+import type { Track } from "../types/music";
 
 const props = defineProps<{
-  tracks: Array<{
-    id: number;
-    title: string;
-    artist: string;
-    album: string;
-    duration: string;
-    color: string;
-  }>;
+  tracks: Track[];
   activeTrackIndex: number;
   currentTrackIndex: number;
   isPlaying: boolean;
   playlistName: string;
+  loading: boolean;
+  errorMessage: string;
 }>();
-
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
@@ -47,7 +42,11 @@ function playTrack(index: number) {
       <span class="col-duration">时长</span>
     </div>
 
-    <ul class="track-list">
+    <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
+    <div v-else-if="props.errorMessage" class="playlist-state error">{{ props.errorMessage }}</div>
+    <div v-else-if="!props.tracks.length" class="playlist-state">暂无可播放的音乐数据</div>
+
+    <ul v-else class="track-list">
       <li
         v-for="(track, index) in props.tracks"
         :key="track.id"
@@ -60,13 +59,13 @@ function playTrack(index: number) {
           <template v-else>{{ index + 1 }}</template>
         </span>
         <div class="track-item">
-          <div class="cover-preview" :style="{ background: track.color }"></div>
+          <img class="cover-preview" :src="track.coverUrl" :alt="track.title" />
           <div class="track-meta">
             <p class="track-title">{{ track.title }}</p>
           </div>
         </div>
         <span class="row-artist">{{ track.artist }}</span>
-        <span class="duration">{{ track.duration }}</span>
+        <span class="duration">{{ track.duration ?? "--:--" }}</span>
       </li>
     </ul>
   </section>
@@ -152,6 +151,20 @@ function playTrack(index: number) {
   padding-left: 4.85rem;
 }
 
+.playlist-state {
+  margin: 0 0.9rem;
+  padding: 1rem 1.1rem;
+  border-radius: 0.9rem;
+  background: rgba(99, 102, 241, 0.08);
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.playlist-state.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+
 .track-list {
   list-style: none;
   margin: 0;
@@ -204,6 +217,8 @@ function playTrack(index: number) {
   width: 3rem;
   height: 3rem;
   border-radius: 0;
+  object-fit: cover;
+  background: rgba(226, 232, 240, 0.9);
 }
 
 .track-meta {
@@ -237,4 +252,3 @@ function playTrack(index: number) {
   text-align: left;
 }
 </style>
-

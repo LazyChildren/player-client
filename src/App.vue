@@ -1,50 +1,19 @@
 <script setup lang="ts">
+import { invoke } from "@tauri-apps/api/core";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import SidebarMenu from "./components/SidebarMenu.vue";
-import PlaylistView from "./components/PlaylistView.vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
+import PlaylistView from "./components/PlaylistView.vue";
+import SettingsDialog from "./components/SettingsDialog.vue";
+import SidebarMenu from "./components/SidebarMenu.vue";
 import WindowControls from "./components/WindowControls.vue";
+import type { AppSettings, Track } from "./types/music";
 
-type Track = {
-  id: number;
-  title: string;
-  artist: string;
-  album: string;
-  duration: string;
-  src: string;
-  color: string;
+const DEFAULT_SETTINGS: AppSettings = {
+  serverIp: "127.0.0.1",
+  serverPort: "3000",
 };
 
-const tracks = ref<Track[]>([
-  {
-    id: 1,
-    title: "Moonlit Drive",
-    artist: "Nova Echo",
-    album: "Midnight Waves",
-    duration: "3:42",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    color: "#6d83ff",
-  },
-  {
-    id: 2,
-    title: "Sunrise Beat",
-    artist: "Aurora Pulse",
-    album: "Daybreak",
-    duration: "4:08",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    color: "#ff8a6f",
-  },
-  {
-    id: 3,
-    title: "Starlight Reverie",
-    artist: "Luna Harbor",
-    album: "Dreamscape",
-    duration: "2:56",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    color: "#3fd2c7",
-  },
-]);
-
+const tracks = ref<Track[]>([]);
 const currentTrackIndex = ref(0);
 const activeTrackIndex = ref(0);
 const currentPlaylistName = ref("默认收藏夹");
@@ -52,40 +21,74 @@ const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const audioRef = ref<HTMLAudioElement | null>(null);
+const isSettingsOpen = ref(false);
+const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
+const isLoadingTracks = ref(false);
+const trackLoadError = ref("");
 
 const currentTrack = computed(() => tracks.value[currentTrackIndex.value]);
 const progress = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0));
 
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+function openSettings() {
+  isSettingsOpen.value = true;
 }
-void formatTime;
 
-function loadTrack() {
-  if (!audioRef.value) return;
-  audioRef.value.src = currentTrack.value.src;
+function closeSettings() {
+  isSettingsOpen.value = false;
+}
+
+async function saveSettings(settings: AppSettings) {
+  savedSettings.value = {
+    serverIp: settings.serverIp,
+    serverPort: settings.serverPort,
+  };
+
+  try {
+    await invoke("save_settings", {
+      settings: {
+        server_ip: savedSettings.value.serverIp,
+        server_port: savedSettings.value.serverPort,
+      },
+    });
+    await fetchTracks();
+  } catch (error) {
+    console.error("Failed to save settings", error);
+  }
+
+  closeSettings();
+}
+
+function applyTrack(track: Track | undefined) {
+  if (!audioRef.value || !track) return;
+
+  audioRef.value.src = track.src;
   audioRef.value.load();
   currentTime.value = 0;
   duration.value = 0;
 }
 
+function loadTrack() {
+  applyTrack(currentTrack.value);
+}
+
 function playPause() {
-  if (!audioRef.value) return;
+  if (!audioRef.value || !tracks.value.length) return;
+
   if (isPlaying.value) {
     audioRef.value.pause();
   } else {
-    audioRef.value.play();
+    void audioRef.value.play();
   }
 }
 
 function prevTrack() {
+  if (!tracks.value.length) return;
   currentTrackIndex.value = (currentTrackIndex.value - 1 + tracks.value.length) % tracks.value.length;
   activeTrackIndex.value = currentTrackIndex.value;
 }
 
 function nextTrack() {
+  if (!tracks.value.length) return;
   currentTrackIndex.value = (currentTrackIndex.value + 1) % tracks.value.length;
   activeTrackIndex.value = currentTrackIndex.value;
 }
@@ -105,16 +108,68 @@ function seek(value: number) {
   audioRef.value.currentTime = (value / 100) * duration.value;
 }
 
+async function fetchTracks() {
+  isLoadingTracks.value = true;
+  trackLoadError.value = "";
+
+  try {
+    const loadedTracks = await invoke<Track[]>("fetch_music_list");
+    tracks.value = loadedTracks;
+
+    if (!loadedTracks.length) {
+      currentTrackIndex.value = 0;
+      activeTrackIndex.value = 0;
+      isPlaying.value = false;
+      return;
+    }
+
+    if (currentTrackIndex.value >= loadedTracks.length) {
+      currentTrackIndex.value = 0;
+    }
+
+    activeTrackIndex.value = currentTrackIndex.value;
+    applyTrack(loadedTracks[currentTrackIndex.value]);
+
+    if (isPlaying.value) {
+      await audioRef.value?.play();
+    }
+  } catch (error) {
+    console.error("Failed to load music list", error);
+    tracks.value = [];
+    currentTrackIndex.value = 0;
+    activeTrackIndex.value = 0;
+    isPlaying.value = false;
+    trackLoadError.value = "音乐列表加载失败，请检查服务器设置。";
+  } finally {
+    isLoadingTracks.value = false;
+  }
+}
+
 watch(currentTrackIndex, () => {
   loadTrack();
   if (isPlaying.value) {
-    audioRef.value?.play();
+    void audioRef.value?.play();
   }
 });
 
 onMounted(() => {
-  loadTrack();
+  void (async () => {
+    try {
+      const loaded = await invoke<AppSettings>("load_settings");
+      savedSettings.value = {
+        serverIp: loaded.serverIp || DEFAULT_SETTINGS.serverIp,
+        serverPort: loaded.serverPort || DEFAULT_SETTINGS.serverPort,
+      };
+    } catch (error) {
+      console.error("Failed to load settings", error);
+      savedSettings.value = { ...DEFAULT_SETTINGS };
+    }
+
+    await fetchTracks();
+  })();
+
   if (!audioRef.value) return;
+
   audioRef.value.addEventListener("timeupdate", () => {
     currentTime.value = audioRef.value?.currentTime ?? 0;
   });
@@ -146,7 +201,7 @@ onUnmounted(() => {
           <input type="search" placeholder="查找音乐..." class="titlebar-search-input" />
         </div>
         <div class="titlebar-right">
-          <WindowControls />
+          <WindowControls @open-settings="openSettings" />
         </div>
       </div>
 
@@ -159,6 +214,8 @@ onUnmounted(() => {
             :currentTrackIndex="currentTrackIndex"
             :isPlaying="isPlaying"
             :playlistName="currentPlaylistName"
+            :loading="isLoadingTracks"
+            :errorMessage="trackLoadError"
             @select="selectTrack"
             @play="playTrack"
           />
@@ -177,6 +234,13 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <SettingsDialog
+      :open="isSettingsOpen"
+      :initialSettings="savedSettings"
+      @save="saveSettings"
+      @cancel="closeSettings"
+    />
+
     <audio ref="audioRef" preload="metadata"></audio>
   </div>
 </template>
@@ -191,8 +255,8 @@ onUnmounted(() => {
   z-index: 9999;
   overflow: hidden;
   border-radius: 1rem;
-  background: radial-gradient(circle at top, rgba(211, 172, 73, 0.00), transparent 0%),
-    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.00), transparent 0%),
+  background: radial-gradient(circle at top, rgba(211, 172, 73, 0), transparent 0%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0), transparent 0%),
     #f5f6fb;
   background-clip: padding-box;
 }
@@ -201,7 +265,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 0.5rem 0rem;
+  padding: 0.5rem 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -354,7 +418,6 @@ onUnmounted(() => {
   }
 }
 
-
 @media (max-width: 1024px) {
   .content-grid {
     grid-template-columns: 1fr;
@@ -388,10 +451,10 @@ body,
   background-clip: padding-box;
 }
 
-*{
-	margin:0;
-	padding:0;
-	border:0
+* {
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .app-content .player-footer {

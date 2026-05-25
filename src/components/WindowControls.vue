@@ -2,6 +2,10 @@
 import { getCurrentWindow, type Window as TauriWindow } from "@tauri-apps/api/window";
 import { onMounted, onUnmounted, ref } from "vue";
 
+const emit = defineEmits<{
+  (event: "open-settings"): void;
+}>();
+
 const isMaximized = ref(false);
 let windowHandle: TauriWindow | null = null;
 let unlistenWindowEvents: Array<() => void> = [];
@@ -14,8 +18,8 @@ async function ensureWindowHandle() {
   try {
     windowHandle = getCurrentWindow();
     return true;
-  } catch (e) {
-    console.warn("Tauri window API not available", e);
+  } catch (error) {
+    console.warn("Tauri window API not available", error);
     windowHandle = null;
     return false;
   }
@@ -23,6 +27,7 @@ async function ensureWindowHandle() {
 
 async function refreshMaximizeState() {
   if (!windowHandle) return;
+
   try {
     isMaximized.value = await windowHandle.isMaximized();
   } catch {
@@ -69,6 +74,7 @@ async function toggleMaximize() {
     await windowHandle?.toggleMaximize();
   } catch {
     if (!windowHandle) return;
+
     const maximized = await windowHandle.isMaximized();
     if (maximized) {
       await windowHandle.unmaximize();
@@ -88,18 +94,21 @@ async function closeWindow() {
 
 <template>
   <div class="window-controls">
-
     <button
       class="window-button"
+      type="button"
       title="设置"
       aria-label="设置"
-      @click="() => {}"
+      @click="emit('open-settings')"
     >
-      <svg t="1779688208128" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3592" id="mx_n_1779688208128" width="16" height="16"><path d="M469.333333 60.693333a85.333333 85.333333 0 0 1 85.333334 0l326.826666 188.714667a85.333333 85.333333 0 0 1 42.666667 73.898667v377.386666a85.333333 85.333333 0 0 1-42.666667 73.898667L554.666667 963.306667a85.333333 85.333333 0 0 1-85.333334 0L142.506667 774.592a85.333333 85.333333 0 0 1-42.666667-73.898667v-377.386666a85.333333 85.333333 0 0 1 42.666667-73.898667z m42.666667 73.898667L185.173333 323.306667v377.386666L512 889.408l326.826667-188.714667v-377.386666L512 134.592zM512 341.333333a170.666667 170.666667 0 1 1 0 341.333334 170.666667 170.666667 0 0 1 0-341.333334z m0 85.333334a85.333333 85.333333 0 1 0 0 170.666666 85.333333 85.333333 0 0 0 0-170.666666z" fill="currentColor" p-id="3593"></path></svg>
-    </button> 
+      <svg t="1779688208128" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3592" id="mx_n_1779688208128" width="16" height="16">
+        <path d="M469.333333 60.693333a85.333333 85.333333 0 0 1 85.333334 0l326.826666 188.714667a85.333333 85.333333 0 0 1 42.666667 73.898667v377.386666a85.333333 85.333333 0 0 1-42.666667 73.898667L554.666667 963.306667a85.333333 85.333333 0 0 1-85.333334 0L142.506667 774.592a85.333333 85.333333 0 0 1-42.666667-73.898667v-377.386666a85.333333 85.333333 0 0 1 42.666667-73.898667z m42.666667 73.898667L185.173333 323.306667v377.386666L512 889.408l326.826667-188.714667v-377.386666L512 134.592zM512 341.333333a170.666667 170.666667 0 1 1 0 341.333334 170.666667 170.666667 0 0 1 0-341.333334z m0 85.333334a85.333333 85.333333 0 1 0 0 170.666666 85.333333 85.333333 0 0 0 0-170.666666z" fill="currentColor" p-id="3593"></path>
+      </svg>
+    </button>
 
     <button
       class="window-button"
+      type="button"
       @click="minimize"
       title="最小化"
       aria-label="最小化"
@@ -111,6 +120,7 @@ async function closeWindow() {
 
     <button
       class="window-button"
+      type="button"
       @click="toggleMaximize"
       :title="isMaximized ? '还原' : '最大化'"
       :aria-label="isMaximized ? '还原' : '最大化'"
@@ -126,6 +136,7 @@ async function closeWindow() {
 
     <button
       class="window-button close-button"
+      type="button"
       @click="closeWindow"
       title="关闭"
       aria-label="关闭"
@@ -148,6 +159,7 @@ async function closeWindow() {
   background: transparent;
   -webkit-app-region: no-drag;
 }
+
 .window-button {
   all: unset;
   width: 2.1rem;
@@ -162,16 +174,20 @@ async function closeWindow() {
   transition: color 0.18s ease, transform 0.18s ease;
   -webkit-app-region: no-drag;
 }
+
 .window-button:hover {
   color: rgba(17, 24, 39, 0.92);
   transform: translateY(-1px);
 }
+
 .window-button svg {
   display: block;
 }
+
 .close-button {
   color: rgba(239, 68, 68, 0.55);
 }
+
 .close-button:hover {
   color: rgba(185, 28, 28, 0.95);
 }

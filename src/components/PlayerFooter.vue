@@ -1,13 +1,8 @@
 <script setup lang="ts">
+import type { Track } from "../types/music";
+
 const props = defineProps<{
-  currentTrack: {
-    id: number;
-    title: string;
-    artist: string;
-    album: string;
-    duration: string;
-    color: string;
-  };
+  currentTrack: Track | undefined;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -32,14 +27,16 @@ function formatTime(seconds: number) {
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 </script>
+
 <template>
   <section class="player-footer">
     <div class="player-footer-inner">
       <div class="player-info-card">
-        <div class="player-cover"></div>
+        <img v-if="props.currentTrack" class="player-cover" :src="props.currentTrack.coverUrl" :alt="props.currentTrack.title" />
+        <div v-else class="player-cover placeholder"></div>
         <div class="player-meta">
-          <h2>{{ props.currentTrack.title }}</h2>
-          <p>{{ props.currentTrack.artist }} · {{ props.currentTrack.album }}</p>
+          <h2>{{ props.currentTrack?.title ?? "未选择歌曲" }}</h2>
+          <p>{{ props.currentTrack?.artist ?? "暂无播放信息" }}</p>
         </div>
       </div>
 
@@ -72,7 +69,7 @@ function formatTime(seconds: number) {
         <div class="time-labels">
           <span>{{ formatTime(props.currentTime) }}</span>
           /
-          <span>{{ props.duration ? formatTime(props.duration) : '0:00' }}</span>
+          <span>{{ props.duration ? formatTime(props.duration) : "0:00" }}</span>
         </div>
       </div>
     </div>
@@ -91,8 +88,6 @@ function formatTime(seconds: number) {
   </section>
 </template>
 
-<!-- formatTime provided in the setup script -->
-
 <style scoped>
 .player-footer {
   position: absolute;
@@ -104,12 +99,12 @@ function formatTime(seconds: number) {
   border-radius: 0;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(128, 128, 128, 0.08);
-
   padding: 0.5rem 1rem 0.75rem;
   display: grid;
   gap: 0.5rem;
   z-index: 50;
 }
+
 .player-footer-inner {
   display: flex;
   align-items: center;
@@ -118,6 +113,7 @@ function formatTime(seconds: number) {
   flex-wrap: nowrap;
   position: relative;
 }
+
 .player-info-card {
   display: flex;
   align-items: center;
@@ -127,12 +123,19 @@ function formatTime(seconds: number) {
   color: #111827;
   flex: 0 0 470px;
 }
+
 .player-cover {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0;
+  object-fit: cover;
   background: rgba(255, 255, 255, 0.45);
 }
+
+.player-cover.placeholder {
+  background: rgba(226, 232, 240, 0.85);
+}
+
 .player-meta h2 {
   margin: 0.2rem 0 0.1rem;
   font-size: 0.85rem;
@@ -153,6 +156,7 @@ function formatTime(seconds: number) {
   transform: translateX(-50%);
   z-index: 1;
 }
+
 .control-button {
   all: unset;
   cursor: pointer;
@@ -166,20 +170,24 @@ function formatTime(seconds: number) {
   color: #4338ca;
   transition: transform 0.2s ease, background 0.2s ease;
 }
+
 .control-button:hover {
   transform: translateY(-2px);
   background: #e0e7ff;
 }
+
 .control-button.primary {
   width: 2.4rem;
   height: 2.4rem;
   background: #eef2ff;
   color: #4338ca;
 }
+
 .control-button .icon {
   width: 18px;
   height: 18px;
 }
+
 .time-labels {
   display: flex;
   gap: 1rem;
@@ -188,9 +196,11 @@ function formatTime(seconds: number) {
   min-width: 9rem;
   justify-content: flex-end;
 }
+
 .progress-block {
   width: 100%;
 }
+
 .progress-slider {
   width: 100%;
   accent-color: #4f46e5;
