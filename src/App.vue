@@ -218,6 +218,7 @@ onUnmounted(() => {
             :errorMessage="trackLoadError"
             @select="selectTrack"
             @play="playTrack"
+            @refresh="fetchTracks"
           />
           <PlayerFooter
             :currentTrack="currentTrack"

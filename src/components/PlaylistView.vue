@@ -15,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: "select", index: number): void;
   (event: "play", index: number): void;
+  (event: "refresh"): void;
 }>();
 
 function selectTrack(index: number) {
@@ -24,13 +25,41 @@ function selectTrack(index: number) {
 function playTrack(index: number) {
   emit("play", index);
 }
+
+function refreshPlaylist() {
+  if (props.loading) return;
+  emit("refresh");
+}
 </script>
 
 <template>
   <section class="playlist-panel">
     <div class="playlist-header">
-      <div>
+      <div class="playlist-header-main">
         <p class="playlist-title">{{ props.playlistName }}</p>
+        <button
+          type="button"
+          class="playlist-refresh-button"
+          :disabled="props.loading"
+          :aria-busy="props.loading"
+          aria-label="刷新音乐列表"
+          title="刷新音乐列表"
+          @click="refreshPlaylist"
+        >
+          <svg
+            class="playlist-refresh-icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M989.311588 512.085547a36.053318 36.053318 0 0 0-38.613317 33.194652 438.570484 438.570484 0 0 1-138.794609 288.63988A438.186484 438.186484 0 0 1 511.999787 951.978697c-87.039964 0-171.093262-25.258656-243.199899-73.258636a439.63715 439.63715 0 0 1-148.778605-166.698598h99.967959a35.967985 35.967985 0 1 0 0-72.021303H36.010652a35.967985 35.967985 0 0 0-36.010652 36.010652v183.97859a35.967985 35.967985 0 1 0 72.021303 0v-85.973298A513.066453 513.066453 0 0 0 228.863905 938.666702C312.917203 994.517346 410.666496 1024 511.999787 1024c130.005279 0 253.994561-48.810646 349.013188-137.386609a509.653121 509.653121 0 0 0 161.493266-335.914527 35.967985 35.967985 0 0 0-33.194653-38.613317zM988.031588 128.000373a35.967985 35.967985 0 0 0-36.053318 36.010652v85.973298A512.298453 512.298453 0 0 0 795.007669 85.333724 509.439788 509.439788 0 0 0 511.999787 0.000427a510.122454 510.122454 0 0 0-349.013188 137.386609 510.207787 510.207787 0 0 0-161.5786 335.914527 36.053318 36.053318 0 0 0 33.194653 38.613317 36.053318 36.053318 0 0 0 38.613317-33.194653 438.570484 438.570484 0 0 1 138.794609-288.63988A438.613151 438.613151 0 0 1 511.999787 71.979063c87.039964 0 171.093262 25.301323 243.199898 73.301303a439.63715 439.63715 0 0 1 148.821272 166.741264h-100.010625a35.967985 35.967985 0 1 0 0 71.978637h183.97859A35.967985 35.967985 0 0 0 1023.999573 347.989615V164.011025A35.967985 35.967985 0 0 0 987.988922 128.000373z"
+              fill="currentColor"
+              opacity="0.72"
+            />
+          </svg>
+        </button>
       </div>
       <span class="playlist-count">{{ props.tracks.length }} 首</span>
     </div>
@@ -119,11 +148,59 @@ function playTrack(index: number) {
   gap: 1rem;
 }
 
+.playlist-header-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .playlist-title {
   margin: 0;
   font-size: 1.55rem;
   font-weight: 700;
   color: #374151;
+  line-height: 1.2;
+}
+
+.playlist-refresh-button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.playlist-refresh-button:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  transform: rotate(20deg);
+}
+
+.playlist-refresh-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+}
+
+.playlist-refresh-button:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+
+.playlist-refresh-button:disabled .playlist-refresh-icon {
+  animation: playlist-refresh-spin 0.9s linear infinite;
+}
+
+.playlist-refresh-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
 }
 
 .playlist-count {
@@ -250,5 +327,11 @@ function playTrack(index: number) {
   font-size: 0.86rem;
   font-weight: 400;
   text-align: left;
+}
+
+@keyframes playlist-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
