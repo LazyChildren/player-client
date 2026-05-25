@@ -54,7 +54,7 @@ function formatTime(seconds: number) {
             </svg>
           </template>
           <template v-else>
-            <svg class="icon" viewBox="0 0 1024 1024" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <svg class="icon play-icon" viewBox="0 0 1024 1024" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
               <path d="M803.84 492.032 213.056 135.04C195.392 124.288 174.208 124.288 156.352 134.976 138.624 145.728 128 164.928 128 186.368l0 714.176c0 21.44 10.624 40.704 28.352 51.392C165.248 957.312 174.976 960 184.704 960c9.728 0 19.52-2.688 28.352-8.064l590.72-356.992c17.728-10.752 28.288-30.016 28.288-51.456C832.128 521.984 821.568 502.72 803.84 492.032zM189.568 891.712 187.136 193.792l578.624 349.696L189.568 891.712z" />
             </svg>
           </template>
@@ -66,11 +66,12 @@ function formatTime(seconds: number) {
           </svg>
         </button>
 
-        <div class="time-labels">
-          <span>{{ formatTime(props.currentTime) }}</span>
-          /
-          <span>{{ props.duration ? formatTime(props.duration) : "0:00" }}</span>
-        </div>
+      </div>
+
+      <div class="time-labels" aria-label="播放时间">
+        <span>{{ formatTime(props.currentTime) }}</span>
+        <span class="time-separator">/</span>
+        <span>{{ props.duration ? formatTime(props.duration) : "0:00" }}</span>
       </div>
     </div>
 
@@ -106,12 +107,11 @@ function formatTime(seconds: number) {
 }
 
 .player-footer-inner {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.75rem;
-  flex-wrap: nowrap;
-  position: relative;
+  column-gap: 1rem;
+  row-gap: 0.5rem;
 }
 
 .player-info-card {
@@ -121,7 +121,9 @@ function formatTime(seconds: number) {
   padding: 0.65rem 0.75rem;
   border-radius: 0;
   color: #111827;
-  flex: 0 0 470px;
+  min-width: 0;
+  width: 100%;
+  justify-self: start;
 }
 
 .player-cover {
@@ -139,22 +141,26 @@ function formatTime(seconds: number) {
 .player-meta h2 {
   margin: 0.2rem 0 0.1rem;
   font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .player-meta p {
   margin: 0;
   color: #4b5563;
   font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .player-controls {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
+  justify-self: center;
+  min-width: max-content;
 }
 
 .control-button {
@@ -168,6 +174,7 @@ function formatTime(seconds: number) {
   overflow: hidden;
   background: #eef2ff;
   color: #4338ca;
+  line-height: 0;
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
@@ -186,15 +193,28 @@ function formatTime(seconds: number) {
 .control-button .icon {
   width: 18px;
   height: 18px;
+  display: block;
+}
+
+.control-button .play-icon {
+  transform: translateX(1px);
 }
 
 .time-labels {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.35rem;
   color: #6b7280;
   font-size: 0.85rem;
   min-width: 9rem;
   justify-content: flex-end;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0.5rem 0;
+}
+
+.time-separator {
+  opacity: 0.7;
 }
 
 .progress-block {
@@ -204,5 +224,26 @@ function formatTime(seconds: number) {
 .progress-slider {
   width: 100%;
   accent-color: #4f46e5;
+}
+
+@media (max-width: 960px) {
+  .player-footer-inner {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+  }
+
+  .player-info-card,
+  .player-controls,
+  .time-labels {
+    justify-self: stretch;
+  }
+
+  .player-controls {
+    justify-self: center;
+  }
+
+  .time-labels {
+    justify-content: flex-end;
+  }
 }
 </style>

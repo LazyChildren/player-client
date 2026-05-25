@@ -460,7 +460,9 @@ body,
 
 .app-content .player-footer {
   position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
-  width: auto;
+  width: 100%;
 }
 </style>
