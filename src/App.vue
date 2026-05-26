@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const tracks = ref<Track[]>([]);
 const currentTrackIndex = ref(0);
 const activeTrackIndex = ref(0);
-const currentPlaylistName = ref("默认收藏夹");
+const currentPlaylistName = ref("默认收藏");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -31,6 +31,7 @@ const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
 const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
+const selectedUploadFile = ref<File | null>(null);
 const uploadSongDraft = ref<UploadSongDraft>({
   fileName: "",
   filePath: "",
@@ -58,6 +59,7 @@ function resetUploadSongDraft() {
     artist: "",
     coverUrl: "",
   };
+  selectedUploadFile.value = null;
 }
 
 async function saveSettings(settings: AppSettings) {
@@ -171,6 +173,10 @@ function updateUploadSongDraft(draft: UploadSongDraft) {
   uploadSongDraft.value = draft;
 }
 
+function showUploadAlert(message: string) {
+  window.alert(message);
+}
+
 function parseUploadFileName(fileName: string) {
   const baseName = fileName.replace(/\.mp3$/i, "").trim();
   const parts = baseName.split("-");
@@ -202,7 +208,7 @@ async function handleUploadFileChange(event: Event) {
     return;
   }
 
-  const title = file.name.replace(/\.mp3$/i, "");
+  const fallbackName = file.name.replace(/\.mp3$/i, "");
   const metadata = await parseMp3Metadata(file).catch((error) => {
     console.error("Failed to parse mp3 metadata", error);
     return { title: "", artist: "" };
@@ -213,11 +219,60 @@ async function handleUploadFileChange(event: Event) {
   uploadSongDraft.value = {
     fileName: file.name,
     filePath: file.name,
-    title: metadata.title || fallback.title || title,
+    title: metadata.title || fallback.title || fallbackName,
     artist: metadata.artist || (hasMetadata ? "" : fallback.artist),
     coverUrl: "",
   };
+  selectedUploadFile.value = file;
   isUploadDialogOpen.value = true;
+}
+
+async function handleFetchCover() {
+  const title = uploadSongDraft.value.title.trim();
+  const artist = uploadSongDraft.value.artist.trim();
+
+  try {
+    const coverUrl = await invoke<string>("fetch_cover_url", {
+      musicName: title,
+      artist,
+    });
+
+    if (coverUrl) {
+      uploadSongDraft.value = {
+        ...uploadSongDraft.value,
+        coverUrl,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to fetch cover url", error);
+    showUploadAlert(error instanceof Error ? error.message : "出错请稍后再试");
+  }
+}
+
+async function handleUploadSong() {
+  if (!selectedUploadFile.value) {
+    showUploadAlert("请选择要上传的音乐文件");
+    return;
+  }
+
+  try {
+    const fileBytes = Array.from(new Uint8Array(await selectedUploadFile.value.arrayBuffer()));
+
+    await invoke("upload_music", {
+      fileName: selectedUploadFile.value.name,
+      fileBytes,
+      musicName: uploadSongDraft.value.title.trim(),
+      artist: uploadSongDraft.value.artist.trim(),
+      coverUrl: uploadSongDraft.value.coverUrl.trim(),
+    });
+
+    showUploadAlert("上传成功");
+    closeUploadDialog();
+    await fetchTracks();
+  } catch (error) {
+    console.error("Failed to upload music", error);
+    showUploadAlert("失败");
+  }
 }
 
 async function fetchTracks() {
@@ -365,6 +420,8 @@ onUnmounted(() => {
       :draft="uploadSongDraft"
       @update:draft="updateUploadSongDraft"
       @cancel="closeUploadDialog"
+      @fetch-cover="handleFetchCover"
+      @upload="handleUploadSong"
     />
 
     <input
@@ -473,6 +530,10 @@ onUnmounted(() => {
   border-color: rgba(99, 102, 241, 0.35);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
   background: rgba(255, 255, 255, 1);
+}
+
+.hidden-upload-input {
+  display: none;
 }
 
 @media (max-width: 1024px) {
@@ -597,9 +658,5 @@ body,
   right: 0;
   bottom: 0;
   width: 100%;
-}
-
-.hidden-upload-input {
-  display: none;
 }
 </style>

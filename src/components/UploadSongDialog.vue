@@ -17,6 +17,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: "update:draft", draft: UploadSongDraft): void;
   (event: "cancel"): void;
+  (event: "fetch-cover"): void;
+  (event: "upload"): void;
 }>();
 
 const localDraft = reactive<UploadSongDraft>({
@@ -62,7 +64,11 @@ function handleCancel() {
 }
 
 function handleFetchCoverLink() {
-  // Reserved for future cover lookup behavior.
+  emit("fetch-cover");
+}
+
+function handleUpload() {
+  emit("upload");
 }
 </script>
 
@@ -88,7 +94,13 @@ function handleFetchCoverLink() {
           <div class="upload-body">
             <div class="cover-panel">
               <div class="cover-frame">
-                <span>封面预留</span>
+                <img
+                  v-if="localDraft.coverUrl"
+                  class="cover-preview-image"
+                  :src="localDraft.coverUrl"
+                  alt="歌曲封面预览"
+                />
+                <span v-else>封面预留</span>
               </div>
               <p class="cover-hint">暂不支持上传歌曲封面</p>
             </div>
@@ -127,6 +139,11 @@ function handleFetchCoverLink() {
               </label>
             </div>
           </div>
+
+          <footer class="upload-actions">
+            <button type="button" class="action-button secondary" @click="handleCancel">取消</button>
+            <button type="button" class="action-button primary" @click="handleUpload">上传</button>
+          </footer>
         </section>
       </div>
     </Transition>
@@ -234,6 +251,14 @@ function handleFetchCoverLink() {
   color: #7c8aa0;
   font-size: 0.92rem;
   font-weight: 600;
+  overflow: hidden;
+}
+
+.cover-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .cover-hint {
@@ -321,6 +346,46 @@ function handleFetchCoverLink() {
   width: 1rem;
   height: 1rem;
   display: block;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.action-button {
+  all: unset;
+  min-width: 4.8rem;
+  padding: 0.72rem 1rem;
+  border-radius: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+  font-weight: 600;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+}
+
+.action-button.secondary {
+  background: rgba(241, 245, 249, 0.95);
+  color: #334155;
+}
+
+.action-button.secondary:hover {
+  background: rgba(226, 232, 240, 0.95);
+}
+
+.action-button.primary {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.action-button.primary:hover {
+  background: #bfdbfe;
 }
 
 .upload-fade-enter-active,
