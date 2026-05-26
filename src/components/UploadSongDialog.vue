@@ -12,6 +12,7 @@ export type UploadSongDraft = {
 const props = defineProps<{
   open: boolean;
   draft: UploadSongDraft;
+  isUploading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (event: "cancel"): void;
   (event: "fetch-cover"): void;
   (event: "upload"): void;
+  (event: "reselect-file"): void;
 }>();
 
 const localDraft = reactive<UploadSongDraft>({
@@ -70,6 +72,10 @@ function handleFetchCoverLink() {
 function handleUpload() {
   emit("upload");
 }
+
+function handleReselectFile() {
+  emit("reselect-file");
+}
 </script>
 
 <template>
@@ -78,13 +84,41 @@ function handleUpload() {
       <div v-if="open" class="upload-overlay" @click.self="handleCancel">
         <section class="upload-dialog" role="dialog" aria-modal="true" aria-labelledby="upload-song-title">
           <header class="upload-header">
-            <div>
+            <div class="upload-header-main">
               <p class="upload-eyebrow">本地音乐上传</p>
               <h2 id="upload-song-title">上传歌曲</h2>
-              <p class="upload-file-name">{{ localDraft.fileName }}</p>
+              <div class="upload-file-row">
+                <p class="upload-file-name">{{ localDraft.fileName }}</p>
+                <button
+                  type="button"
+                  class="file-reselect-button"
+                  aria-label="重新选择文件"
+                  title="重新选择文件"
+                  :disabled="props.isUploading"
+                  @click="handleReselectFile"
+                >
+                  <svg
+                    class="file-reselect-icon"
+                    viewBox="0 0 1024 1024"
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M341.333333 337.066667l115.2-115.2c8.533333-8.533333 17.066667-12.8 29.866667-17.066667v473.6c0 17.066667 12.8 29.866667 25.6 29.866667s25.6-12.8 25.6-29.866667V204.8c8.533333 4.266667 21.333333 8.533333 29.866667 17.066667L682.666667 337.066667c4.266667 4.266667 12.8 8.533333 21.333333 8.533333s12.8-4.266667 21.333333-8.533333c12.8-12.8 12.8-29.866667 0-38.4l-115.2-115.2C554.666667 132.266667 469.333333 132.266667 418.133333 183.466667L302.933333 298.666667c-12.8 12.8-12.8 29.866667 0 38.4s25.6 12.8 38.4 0z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M844.8 546.133333c-17.066667 0-29.866667 12.8-29.866667 25.6v170.666667c0 42.666667-34.133333 76.8-76.8 76.8H285.866667c-42.666667 0-76.8-34.133333-76.8-76.8v-170.666667c0-17.066667-12.8-25.6-25.6-25.6s-25.6 12.8-25.6 25.6v170.666667c0 72.533333 59.733333 132.266667 132.266666 132.266667h456.533334c72.533333 0 132.266667-59.733333 132.266666-132.266667v-170.666667c-4.266667-12.8-17.066667-25.6-34.133333-25.6z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <p class="upload-file-name subtle">{{ localDraft.filePath }}</p>
             </div>
 
-            <button type="button" class="dialog-close-button" aria-label="关闭上传窗口" @click="handleCancel">
+            <button type="button" class="dialog-close-button" aria-label="关闭上传窗口" :disabled="props.isUploading" @click="handleCancel">
               <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                 <path d="M2 2l8 8M10 2l-8 8" />
               </svg>
@@ -100,7 +134,7 @@ function handleUpload() {
                   :src="localDraft.coverUrl"
                   alt="歌曲封面预览"
                 />
-                <span v-else>封面预览</span>
+                <span v-else>封面预留</span>
               </div>
               <p class="cover-hint">暂不支持上传歌曲封面</p>
             </div>
@@ -120,7 +154,14 @@ function handleUpload() {
                 <span>歌曲封面</span>
                 <div class="cover-link-row">
                   <input v-model="localDraft.coverUrl" type="text" placeholder="暂不支持直接输入" disabled />
-                  <button type="button" class="cover-link-button" aria-label="获取封面链接" title="获取封面链接" @click="handleFetchCoverLink">
+                  <button
+                    type="button"
+                    class="cover-link-button"
+                    aria-label="获取封面链接"
+                    title="获取封面链接"
+                    :disabled="props.isUploading"
+                    @click="handleFetchCoverLink"
+                  >
                     <svg
                       class="cover-link-icon"
                       viewBox="0 0 1024 1024"
@@ -141,8 +182,11 @@ function handleUpload() {
           </div>
 
           <footer class="upload-actions">
-            <button type="button" class="action-button secondary" @click="handleCancel">取消</button>
-            <button type="button" class="action-button primary" @click="handleUpload">上传</button>
+            <button type="button" class="action-button secondary" :disabled="props.isUploading" @click="handleCancel">取消</button>
+            <button type="button" class="action-button primary" :disabled="props.isUploading" @click="handleUpload">
+              <span v-if="props.isUploading" class="button-spinner" aria-hidden="true"></span>
+              <span>{{ props.isUploading ? "上传中..." : "上传" }}</span>
+            </button>
           </footer>
         </section>
       </div>
@@ -186,6 +230,10 @@ function handleUpload() {
   background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(14, 165, 233, 0.05));
 }
 
+.upload-header-main {
+  min-width: 0;
+}
+
 .upload-eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.74rem;
@@ -200,10 +248,58 @@ function handleUpload() {
   color: #0f172a;
 }
 
+.upload-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
 .upload-file-name {
   margin: 0.45rem 0 0;
   color: #64748b;
   font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-file-name.subtle {
+  margin-top: 0.25rem;
+  color: #94a3b8;
+}
+
+.file-reselect-button {
+  all: unset;
+  width: 1.85rem;
+  height: 1.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  cursor: pointer;
+  color: #4f46e5;
+  background: rgba(79, 70, 229, 0.08);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+  flex: 0 0 auto;
+}
+
+.file-reselect-button:hover {
+  background: rgba(79, 70, 229, 0.14);
+  color: #3730a3;
+  transform: translateY(-1px);
+}
+
+.file-reselect-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.file-reselect-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  display: block;
 }
 
 .dialog-close-button {
@@ -223,6 +319,11 @@ function handleUpload() {
   background: rgba(148, 163, 184, 0.15);
   color: #0f172a;
   transform: translateY(-1px);
+}
+
+.dialog-close-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .upload-body {
@@ -342,6 +443,12 @@ function handleUpload() {
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
 }
 
+.cover-link-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .cover-link-icon {
   width: 1rem;
   height: 1rem;
@@ -370,6 +477,12 @@ function handleUpload() {
   transform: translateY(-1px);
 }
 
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
+}
+
 .action-button.secondary {
   background: rgba(241, 245, 249, 0.95);
   color: #334155;
@@ -386,6 +499,18 @@ function handleUpload() {
 
 .action-button.primary:hover {
   background: #bfdbfe;
+}
+
+.button-spinner {
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid rgba(29, 78, 216, 0.18);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.45rem;
+  animation: button-spin 0.8s linear infinite;
+  vertical-align: -0.1rem;
 }
 
 .upload-fade-enter-active,
@@ -405,6 +530,12 @@ function handleUpload() {
 
   to {
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
+import { ElMessage } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
 import PlaylistView from "./components/PlaylistView.vue";
@@ -32,6 +33,7 @@ const trackLoadError = ref("");
 const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
 const selectedUploadFile = ref<File | null>(null);
+const isUploadingSong = ref(false);
 const uploadSongDraft = ref<UploadSongDraft>({
   fileName: "",
   filePath: "",
@@ -160,7 +162,14 @@ function openUploadPicker() {
   uploadFileInputRef.value?.click();
 }
 
-function closeUploadDialog() {
+function reselectUploadFile() {
+  if (isUploadingSong.value) return;
+  uploadFileInputRef.value?.click();
+}
+
+function closeUploadDialog(force = false) {
+  if (isUploadingSong.value && !force) return;
+
   isUploadDialogOpen.value = false;
   resetUploadSongDraft();
 
@@ -174,7 +183,15 @@ function updateUploadSongDraft(draft: UploadSongDraft) {
 }
 
 function showUploadAlert(message: string) {
-  window.alert(message);
+  ElMessage({
+    message,
+    type: "warning",
+    duration: 2600,
+    showClose: true,
+    grouping: false,
+    offset: 24,
+    zIndex: 20050,
+  });
 }
 
 function parseUploadFileName(fileName: string) {
@@ -255,6 +272,8 @@ async function handleUploadSong() {
     return;
   }
 
+  isUploadingSong.value = true;
+
   try {
     const fileBytes = Array.from(new Uint8Array(await selectedUploadFile.value.arrayBuffer()));
 
@@ -266,12 +285,31 @@ async function handleUploadSong() {
       coverUrl: uploadSongDraft.value.coverUrl.trim(),
     });
 
-    showUploadAlert("上传成功");
-    closeUploadDialog();
+    isUploadingSong.value = false;
+    closeUploadDialog(true);
+
+    ElMessage({
+      message: "上传成功",
+      type: "success",
+      duration: 2200,
+      showClose: true,
+      grouping: false,
+      offset: 24,
+      zIndex: 20050,
+    });
     await fetchTracks();
   } catch (error) {
     console.error("Failed to upload music", error);
-    showUploadAlert("失败");
+    isUploadingSong.value = false;
+    ElMessage({
+      message: "失败",
+      type: "error",
+      duration: 3200,
+      showClose: true,
+      grouping: false,
+      offset: 24,
+      zIndex: 20050,
+    });
   }
 }
 
@@ -418,10 +456,12 @@ onUnmounted(() => {
     <UploadSongDialog
       :open="isUploadDialogOpen"
       :draft="uploadSongDraft"
+      :isUploading="isUploadingSong"
       @update:draft="updateUploadSongDraft"
       @cancel="closeUploadDialog"
       @fetch-cover="handleFetchCover"
       @upload="handleUploadSong"
+      @reselect-file="reselectUploadFile"
     />
 
     <input
