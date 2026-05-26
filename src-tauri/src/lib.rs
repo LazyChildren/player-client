@@ -106,7 +106,7 @@ struct CoverUrlResponse {
 struct UploadResponse {
     code: String,
     msg: String,
-    data: String,
+    data: Option<String>,
 }
 
 #[tauri::command]
@@ -213,7 +213,11 @@ async fn upload_music(
         .map_err(|error| error.to_string())?;
 
     if payload.code != "200" {
-        return Err("失败".to_string());
+        return Err(if payload.msg.trim().is_empty() {
+            "失败".to_string()
+        } else {
+            payload.msg
+        });
     }
 
     Ok(())

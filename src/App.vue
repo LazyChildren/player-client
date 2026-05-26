@@ -7,8 +7,8 @@ import PlaylistView from "./components/PlaylistView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
-import { parseMp3Metadata } from "./utils/mp3Metadata";
 import WindowControls from "./components/WindowControls.vue";
+import { parseMp3Metadata } from "./utils/mp3Metadata";
 import type { AppSettings, Track } from "./types/music";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const tracks = ref<Track[]>([]);
 const currentTrackIndex = ref(0);
 const activeTrackIndex = ref(0);
-const currentPlaylistName = ref("默认收藏");
+const currentPlaylistName = ref("默认歌单");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -222,6 +222,7 @@ async function handleUploadFileChange(event: Event) {
 
   if (!file.name.toLowerCase().endsWith(".mp3")) {
     input.value = "";
+    showUploadAlert("请选择 MP3 格式的音乐文件");
     return;
   }
 
@@ -302,9 +303,9 @@ async function handleUploadSong() {
     console.error("Failed to upload music", error);
     isUploadingSong.value = false;
     ElMessage({
-      message: "失败",
+      message: error instanceof Error && error.message ? error.message : "上传失败",
       type: "error",
-      duration: 3200,
+      duration: 3000,
       showClose: true,
       grouping: false,
       offset: 24,
@@ -483,7 +484,6 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 9999;
   overflow: hidden;
   border-radius: 1rem;
   background: radial-gradient(circle at top, rgba(211, 172, 73, 0), transparent 0%),

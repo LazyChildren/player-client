@@ -97,13 +97,7 @@ function handleReselectFile() {
                   :disabled="props.isUploading"
                   @click="handleReselectFile"
                 >
-                  <svg
-                    class="file-reselect-icon"
-                    viewBox="0 0 1024 1024"
-                    version="1.1"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
+                  <svg class="file-reselect-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path
                       d="M341.333333 337.066667l115.2-115.2c8.533333-8.533333 17.066667-12.8 29.866667-17.066667v473.6c0 17.066667 12.8 29.866667 25.6 29.866667s25.6-12.8 25.6-29.866667V204.8c8.533333 4.266667 21.333333 8.533333 29.866667 17.066667L682.666667 337.066667c4.266667 4.266667 12.8 8.533333 21.333333 8.533333s12.8-4.266667 21.333333-8.533333c12.8-12.8 12.8-29.866667 0-38.4l-115.2-115.2C554.666667 132.266667 469.333333 132.266667 418.133333 183.466667L302.933333 298.666667c-12.8 12.8-12.8 29.866667 0 38.4s25.6 12.8 38.4 0z"
                       fill="currentColor"
@@ -128,13 +122,8 @@ function handleReselectFile() {
           <div class="upload-body">
             <div class="cover-panel">
               <div class="cover-frame">
-                <img
-                  v-if="localDraft.coverUrl"
-                  class="cover-preview-image"
-                  :src="localDraft.coverUrl"
-                  alt="歌曲封面预览"
-                />
-                <span v-else>封面预留</span>
+                <img v-if="localDraft.coverUrl" class="cover-preview-image" :src="localDraft.coverUrl" alt="歌曲封面预览" />
+                <span v-else>封面预览</span>
               </div>
               <p class="cover-hint">暂不支持上传歌曲封面</p>
             </div>
@@ -162,13 +151,7 @@ function handleReselectFile() {
                     :disabled="props.isUploading"
                     @click="handleFetchCoverLink"
                   >
-                    <svg
-                      class="cover-link-icon"
-                      viewBox="0 0 1024 1024"
-                      version="1.1"
-                      xmlns="http://www.w3.org/2000/svg"
-                      aria-hidden="true"
-                    >
+                    <svg class="cover-link-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <path
                         d="M910.496 213.536C804.16 82.208 611.488 61.952 480.128 168.32l-100.768 81.6 50.336 62.176 100.768-81.6a225.984 225.984 0 1 1 284.448 351.264l-107.968 87.424 50.336 62.176 107.968-87.424a305.984 305.984 0 0 0 45.248-430.4zM516.352 823.552a225.984 225.984 0 1 1-284.448-351.264l110.976-89.856-50.336-62.176-110.976 89.856C50.24 516.448 29.984 709.152 136.32 840.48c106.336 131.328 299.04 151.584 430.368 45.248l105.12-85.12-50.336-62.176-105.12 85.12z"
                         fill="currentColor"
@@ -198,13 +181,11 @@ function handleReselectFile() {
 .upload-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
   box-sizing: border-box;
-  background: rgba(15, 23, 42, 0.34);
   -webkit-app-region: no-drag;
 }
 
@@ -457,6 +438,7 @@ function handleReselectFile() {
 
 .upload-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 0 1.25rem 1.25rem;
