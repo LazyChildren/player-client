@@ -60,7 +60,29 @@ function refreshPlaylist() {
           </svg>
         </button>
       </div>
-      <span class="playlist-count">{{ props.tracks.length }} 首</span>
+
+      <div class="playlist-header-actions">
+        <span class="playlist-count">{{ props.tracks.length }} 首</span>
+        <button type="button" class="playlist-upload-button" aria-label="上传歌曲" title="上传歌曲">
+          <svg
+            class="playlist-upload-icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M341.333333 337.066667l115.2-115.2c8.533333-8.533333 17.066667-12.8 29.866667-17.066667v473.6c0 17.066667 12.8 29.866667 25.6 29.866667s25.6-12.8 25.6-29.866667V204.8c8.533333 4.266667 21.333333 8.533333 29.866667 17.066667L682.666667 337.066667c4.266667 4.266667 12.8 8.533333 21.333333 8.533333s12.8-4.266667 21.333333-8.533333c12.8-12.8 12.8-29.866667 0-38.4l-115.2-115.2C554.666667 132.266667 469.333333 132.266667 418.133333 183.466667L302.933333 298.666667c-12.8 12.8-12.8 29.866667 0 38.4s25.6 12.8 38.4 0z"
+              fill="currentColor"
+            />
+            <path
+              d="M844.8 546.133333c-17.066667 0-29.866667 12.8-29.866667 25.6v170.666667c0 42.666667-34.133333 76.8-76.8 76.8H285.866667c-42.666667 0-76.8-34.133333-76.8-76.8v-170.666667c0-17.066667-12.8-25.6-25.6-25.6s-25.6 12.8-25.6 25.6v170.666667c0 72.533333 59.733333 132.266667 132.266666 132.266667h456.533334c72.533333 0 132.266667-59.733333 132.266666-132.266667v-170.666667c-4.266667-12.8-17.066667-25.6-34.133333-25.6z"
+              fill="currentColor"
+            />
+          </svg>
+          <span>上传歌曲</span>
+        </button>
+      </div>
     </div>
 
     <div class="track-table-header">
@@ -169,6 +191,14 @@ function refreshPlaylist() {
   min-width: 0;
 }
 
+.playlist-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 .playlist-title {
   margin: 0;
   font-size: 1.55rem;
@@ -215,6 +245,40 @@ function refreshPlaylist() {
   width: 1rem;
   height: 1rem;
   display: block;
+}
+
+.playlist-upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.2rem;
+  padding: 0 0.85rem;
+  border-radius: 9999px;
+  background: rgba(79, 70, 229, 0.1);
+  color: #4338ca;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.playlist-upload-button:hover {
+  background: rgba(79, 70, 229, 0.16);
+  color: #3730a3;
+  transform: translateY(-1px);
+}
+
+.playlist-upload-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+}
+
+.playlist-upload-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .playlist-count {
@@ -349,7 +413,6 @@ function refreshPlaylist() {
 .cover-preview {
   width: 3rem;
   height: 3rem;
-  border-radius: 0;
   object-fit: cover;
   background: rgba(226, 232, 240, 0.9);
   border-radius: 0.2rem;

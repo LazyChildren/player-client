@@ -389,7 +389,7 @@ function formatTime(seconds: number) {
 
 .volume-slider {
   width: 7.25rem;
-  height: 0.2rem;
+  height: 0.3rem;
   accent-color: #787878;
   transform: rotate(-90deg);
   transform-origin: center;
