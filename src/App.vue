@@ -6,6 +6,7 @@ import PlaylistView from "./components/PlaylistView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
+import { parseMp3Metadata } from "./utils/mp3Metadata";
 import WindowControls from "./components/WindowControls.vue";
 import type { AppSettings, Track } from "./types/music";
 
@@ -170,7 +171,27 @@ function updateUploadSongDraft(draft: UploadSongDraft) {
   uploadSongDraft.value = draft;
 }
 
-function handleUploadFileChange(event: Event) {
+function parseUploadFileName(fileName: string) {
+  const baseName = fileName.replace(/\.mp3$/i, "").trim();
+  const parts = baseName.split("-");
+
+  if (parts.length < 2) {
+    return {
+      title: baseName,
+      artist: "",
+    };
+  }
+
+  const title = parts[0]?.trim() ?? "";
+  const artist = parts.slice(1).join("-").trim();
+
+  return {
+    title: title || baseName,
+    artist,
+  };
+}
+
+async function handleUploadFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
 
@@ -182,12 +203,18 @@ function handleUploadFileChange(event: Event) {
   }
 
   const title = file.name.replace(/\.mp3$/i, "");
+  const metadata = await parseMp3Metadata(file).catch((error) => {
+    console.error("Failed to parse mp3 metadata", error);
+    return { title: "", artist: "" };
+  });
+  const fallback = parseUploadFileName(file.name);
+  const hasMetadata = Boolean(metadata.title || metadata.artist);
 
   uploadSongDraft.value = {
     fileName: file.name,
     filePath: file.name,
-    title,
-    artist: "",
+    title: metadata.title || fallback.title || title,
+    artist: metadata.artist || (hasMetadata ? "" : fallback.artist),
     coverUrl: "",
   };
   isUploadDialogOpen.value = true;
