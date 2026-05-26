@@ -100,7 +100,7 @@ function handleUpload() {
                   :src="localDraft.coverUrl"
                   alt="歌曲封面预览"
                 />
-                <span v-else>封面预留</span>
+                <span v-else>封面预览</span>
               </div>
               <p class="cover-hint">暂不支持上传歌曲封面</p>
             </div>
