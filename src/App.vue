@@ -5,6 +5,7 @@ import PlayerFooter from "./components/PlayerFooter.vue";
 import PlaylistView from "./components/PlaylistView.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
+import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
 import type { AppSettings, Track } from "./types/music";
 
@@ -27,6 +28,15 @@ const isSettingsOpen = ref(false);
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
+const uploadFileInputRef = ref<HTMLInputElement | null>(null);
+const isUploadDialogOpen = ref(false);
+const uploadSongDraft = ref<UploadSongDraft>({
+  fileName: "",
+  filePath: "",
+  title: "",
+  artist: "",
+  coverUrl: "",
+});
 
 const currentTrack = computed(() => tracks.value[currentTrackIndex.value]);
 const progress = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0));
@@ -37,6 +47,16 @@ function openSettings() {
 
 function closeSettings() {
   isSettingsOpen.value = false;
+}
+
+function resetUploadSongDraft() {
+  uploadSongDraft.value = {
+    fileName: "",
+    filePath: "",
+    title: "",
+    artist: "",
+    coverUrl: "",
+  };
 }
 
 async function saveSettings(settings: AppSettings) {
@@ -131,6 +151,46 @@ function toggleMute() {
 
   previousVolume.value = volume.value;
   setVolume(0);
+}
+
+function openUploadPicker() {
+  uploadFileInputRef.value?.click();
+}
+
+function closeUploadDialog() {
+  isUploadDialogOpen.value = false;
+  resetUploadSongDraft();
+
+  if (uploadFileInputRef.value) {
+    uploadFileInputRef.value.value = "";
+  }
+}
+
+function updateUploadSongDraft(draft: UploadSongDraft) {
+  uploadSongDraft.value = draft;
+}
+
+function handleUploadFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  if (!file.name.toLowerCase().endsWith(".mp3")) {
+    input.value = "";
+    return;
+  }
+
+  const title = file.name.replace(/\.mp3$/i, "");
+
+  uploadSongDraft.value = {
+    fileName: file.name,
+    filePath: file.name,
+    title,
+    artist: "",
+    coverUrl: "",
+  };
+  isUploadDialogOpen.value = true;
 }
 
 async function fetchTracks() {
@@ -246,6 +306,7 @@ onUnmounted(() => {
             @select="selectTrack"
             @play="playTrack"
             @refresh="fetchTracks"
+            @upload="openUploadPicker"
           />
           <PlayerFooter
             :currentTrack="currentTrack"
@@ -270,6 +331,21 @@ onUnmounted(() => {
       :initialSettings="savedSettings"
       @save="saveSettings"
       @cancel="closeSettings"
+    />
+
+    <UploadSongDialog
+      :open="isUploadDialogOpen"
+      :draft="uploadSongDraft"
+      @update:draft="updateUploadSongDraft"
+      @cancel="closeUploadDialog"
+    />
+
+    <input
+      ref="uploadFileInputRef"
+      type="file"
+      accept=".mp3,audio/mpeg"
+      class="hidden-upload-input"
+      @change="handleUploadFileChange"
     />
 
     <audio ref="audioRef" preload="metadata"></audio>
@@ -494,5 +570,9 @@ body,
   right: 0;
   bottom: 0;
   width: 100%;
+}
+
+.hidden-upload-input {
+  display: none;
 }
 </style>

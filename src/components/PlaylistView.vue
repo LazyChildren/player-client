@@ -15,6 +15,7 @@ const emit = defineEmits<{
   (event: "select", index: number): void;
   (event: "play", index: number): void;
   (event: "refresh"): void;
+  (event: "upload"): void;
 }>();
 
 function selectTrack(index: number) {
@@ -28,6 +29,10 @@ function playTrack(index: number) {
 function refreshPlaylist() {
   if (props.loading) return;
   emit("refresh");
+}
+
+function openUploadDialog() {
+  emit("upload");
 }
 </script>
 
@@ -63,7 +68,7 @@ function refreshPlaylist() {
 
       <div class="playlist-header-actions">
         <span class="playlist-count">{{ props.tracks.length }} 首</span>
-        <button type="button" class="playlist-upload-button" aria-label="上传歌曲" title="上传歌曲">
+        <button type="button" class="playlist-upload-button" aria-label="上传歌曲" title="上传歌曲" @click="openUploadDialog">
           <svg
             class="playlist-upload-icon"
             viewBox="0 0 1024 1024"
