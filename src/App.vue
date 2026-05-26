@@ -20,6 +20,8 @@ const currentPlaylistName = ref("默认收藏夹");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
+const volume = ref(80);
+const previousVolume = ref(80);
 const audioRef = ref<HTMLAudioElement | null>(null);
 const isSettingsOpen = ref(false);
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
@@ -108,6 +110,29 @@ function seek(value: number) {
   audioRef.value.currentTime = (value / 100) * duration.value;
 }
 
+function setVolume(value: number) {
+  const nextVolume = Math.min(100, Math.max(0, value));
+  volume.value = nextVolume;
+
+  if (nextVolume > 0) {
+    previousVolume.value = nextVolume;
+  }
+
+  if (audioRef.value) {
+    audioRef.value.volume = nextVolume / 100;
+  }
+}
+
+function toggleMute() {
+  if (volume.value === 0) {
+    setVolume(previousVolume.value || 80);
+    return;
+  }
+
+  previousVolume.value = volume.value;
+  setVolume(0);
+}
+
 async function fetchTracks() {
   isLoadingTracks.value = true;
   trackLoadError.value = "";
@@ -170,6 +195,8 @@ onMounted(() => {
 
   if (!audioRef.value) return;
 
+  audioRef.value.volume = volume.value / 100;
+
   audioRef.value.addEventListener("timeupdate", () => {
     currentTime.value = audioRef.value?.currentTime ?? 0;
   });
@@ -226,10 +253,13 @@ onUnmounted(() => {
             :currentTime="currentTime"
             :duration="duration"
             :progress="progress"
+            :volume="volume"
             @prev="prevTrack"
             @playPause="playPause"
             @next="nextTrack"
             @seek="seek"
+            @set-volume="setVolume"
+            @toggle-mute="toggleMute"
           />
         </main>
       </div>

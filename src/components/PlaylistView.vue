@@ -352,6 +352,7 @@ function refreshPlaylist() {
   border-radius: 0;
   object-fit: cover;
   background: rgba(226, 232, 240, 0.9);
+  border-radius: 0.2rem;
 }
 
 .track-meta {
