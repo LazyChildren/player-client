@@ -49,6 +49,18 @@ const uploadSongDraft = ref<UploadSongDraft>({
 
 const currentTrack = computed(() => tracks.value[currentTrackIndex.value]);
 const progress = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0));
+const searchQuery = ref("");
+const filteredTracks = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  const rows = tracks.value.map((track, index) => ({ track, originalIndex: index }));
+  if (!query) return rows;
+  return rows.filter(({ track }) => {
+    return (
+      track.title.toLowerCase().includes(query) ||
+      track.artist.toLowerCase().includes(query)
+    );
+  });
+});
 
 function openSettings() {
   isSettingsOpen.value = true;
@@ -478,7 +490,12 @@ onUnmounted(() => {
       <div class="titlebar">
         <div class="titlebar-left"></div>
         <div class="titlebar-center">
-          <input type="search" placeholder="查找音乐..." class="titlebar-search-input" />
+          <input
+            type="search"
+            placeholder="查找音乐..."
+            class="titlebar-search-input"
+            v-model="searchQuery"
+          />
         </div>
         <div class="titlebar-right">
           <WindowControls @open-settings="openSettings" />
@@ -489,7 +506,7 @@ onUnmounted(() => {
         <SidebarMenu />
         <main class="main-panel">
           <PlaylistView
-            :tracks="tracks"
+            :tracks="filteredTracks"
             :activeTrackIndex="activeTrackIndex"
             :currentTrackIndex="currentTrackIndex"
             :isPlaying="isPlaying"

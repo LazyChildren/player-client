@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import type { Track } from "../types/music";
 
+type TrackRow = {
+  track: Track;
+  originalIndex: number;
+};
+
 const props = defineProps<{
-  tracks: Track[];
+  tracks: TrackRow[];
   activeTrackIndex: number;
   currentTrackIndex: number;
   isPlaying: boolean;
@@ -103,14 +108,14 @@ function openUploadDialog() {
 
     <ul v-else class="track-list">
       <li
-        v-for="(track, index) in props.tracks"
-        :key="track.id"
-        :class="{ active: index === props.activeTrackIndex }"
-        @click="selectTrack(index)"
-        @dblclick="playTrack(index)"
+        v-for="(item, index) in props.tracks"
+        :key="item.track.id"
+        :class="{ active: item.originalIndex === props.activeTrackIndex }"
+        @click="selectTrack(item.originalIndex)"
+        @dblclick="playTrack(item.originalIndex)"
       >
         <span class="row-index">
-          <span v-if="props.isPlaying && index === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
+          <span v-if="props.isPlaying && item.originalIndex === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
             <svg
               t="1779702244479"
               class="icon playing-bars-icon"
@@ -129,13 +134,13 @@ function openUploadDialog() {
           <template v-else>{{ index + 1 }}</template>
         </span>
         <div class="track-item">
-          <img class="cover-preview" :src="track.coverUrl" :alt="track.title" />
+          <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
           <div class="track-meta">
-            <p class="track-title">{{ track.title }}</p>
+            <p class="track-title">{{ item.track.title }}</p>
           </div>
         </div>
-        <span class="row-artist">{{ track.artist }}</span>
-        <span class="duration">{{ track.duration ?? "--:--" }}</span>
+        <span class="row-artist">{{ item.track.artist }}</span>
+        <span class="duration">{{ item.track.duration ?? "--:--" }}</span>
       </li>
     </ul>
   </section>
