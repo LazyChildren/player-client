@@ -199,10 +199,6 @@ function playbackOrderTitle() {
 
 <style scoped>
 .player-footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   width: 100%;
   box-sizing: border-box;
   border-radius: 0;
@@ -211,7 +207,7 @@ function playbackOrderTitle() {
   padding: 0.5rem 1rem 0.75rem;
   display: grid;
   gap: 0.5rem;
-  z-index: 50;
+  flex: 0 0 auto;
 }
 
 .player-footer-inner {

@@ -101,48 +101,49 @@ function openUploadDialog() {
       <span class="col-artist">艺术家</span>
       <span class="col-duration">时长</span>
     </div>
+    <div class="playlist-body">
+      <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
+      <div v-else-if="props.errorMessage" class="playlist-state error">{{ props.errorMessage }}</div>
+      <div v-else-if="!props.tracks.length" class="playlist-state">暂无可播放的音乐数据</div>
 
-    <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
-    <div v-else-if="props.errorMessage" class="playlist-state error">{{ props.errorMessage }}</div>
-    <div v-else-if="!props.tracks.length" class="playlist-state">暂无可播放的音乐数据</div>
-
-    <ul v-else class="track-list">
-      <li
-        v-for="(item, index) in props.tracks"
-        :key="item.track.id"
-        :class="{ active: item.originalIndex === props.activeTrackIndex }"
-        @click="selectTrack(item.originalIndex)"
-        @dblclick="playTrack(item.originalIndex)"
-      >
-        <span class="row-index">
-          <span v-if="props.isPlaying && item.originalIndex === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
-            <svg
-              t="1779702244479"
-              class="icon playing-bars-icon"
-              viewBox="0 0 1024 1024"
-              version="1.1"
-              xmlns="http://www.w3.org/2000/svg"
-              p-id="21004"
-            >
-              <rect class="playing-bar bar-1" x="682.666667" y="298.666667" width="42.666666" height="469.333333" />
-              <rect class="playing-bar bar-2" x="341.333333" y="298.666667" width="42.666667" height="469.333333" />
-              <rect class="playing-bar bar-3" x="170.666667" y="426.666667" width="42.666666" height="213.333333" />
-              <rect class="playing-bar bar-4" x="853.333333" y="426.666667" width="42.666667" height="213.333333" />
-              <rect class="playing-bar bar-5" x="512" y="170.666667" width="42.666667" height="725.333333" />
-            </svg>
+      <ul v-else class="track-list">
+        <li
+          v-for="(item, index) in props.tracks"
+          :key="item.track.id"
+          :class="{ active: item.originalIndex === props.activeTrackIndex }"
+          @click="selectTrack(item.originalIndex)"
+          @dblclick="playTrack(item.originalIndex)"
+        >
+          <span class="row-index">
+            <span v-if="props.isPlaying && item.originalIndex === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
+              <svg
+                t="1779702244479"
+                class="icon playing-bars-icon"
+                viewBox="0 0 1024 1024"
+                version="1.1"
+                xmlns="http://www.w3.org/2000/svg"
+                p-id="21004"
+              >
+                <rect class="playing-bar bar-1" x="682.666667" y="298.666667" width="42.666666" height="469.333333" />
+                <rect class="playing-bar bar-2" x="341.333333" y="298.666667" width="42.666667" height="469.333333" />
+                <rect class="playing-bar bar-3" x="170.666667" y="426.666667" width="42.666666" height="213.333333" />
+                <rect class="playing-bar bar-4" x="853.333333" y="426.666667" width="42.666667" height="213.333333" />
+                <rect class="playing-bar bar-5" x="512" y="170.666667" width="42.666667" height="725.333333" />
+              </svg>
+            </span>
+            <template v-else>{{ index + 1 }}</template>
           </span>
-          <template v-else>{{ index + 1 }}</template>
-        </span>
-        <div class="track-item">
-          <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
-          <div class="track-meta">
-            <p class="track-title">{{ item.track.title }}</p>
+          <div class="track-item">
+            <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
+            <div class="track-meta">
+              <p class="track-title">{{ item.track.title }}</p>
+            </div>
           </div>
-        </div>
-        <span class="row-artist">{{ item.track.artist }}</span>
-        <span class="duration">{{ item.track.duration ?? "--:--" }}</span>
-      </li>
-    </ul>
+          <span class="row-artist">{{ item.track.artist }}</span>
+          <span class="duration">{{ item.track.duration ?? "--:--" }}</span>
+        </li>
+      </ul>
+    </div>
   </section>
 </template>
 
@@ -150,39 +151,41 @@ function openUploadDialog() {
 .playlist-panel {
   background: rgba(255, 255, 255, 0.88);
   border-radius: 0;
-  padding: 1.6rem;
+  padding: 0.7rem;
   display: flex;
   flex-direction: column;
   gap: 1.4rem;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
 }
 
-.playlist-panel::-webkit-scrollbar {
+.playlist-body::-webkit-scrollbar {
   width: 10px;
 }
 
-.playlist-panel::-webkit-scrollbar-track {
+.playlist-body::-webkit-scrollbar-track {
   background: rgba(245, 246, 251, 0.5);
   border-radius: 0;
 }
 
-.playlist-panel::-webkit-scrollbar-thumb {
+.playlist-body::-webkit-scrollbar-thumb {
   background: rgba(99, 102, 241, 0.4);
   border-radius: 0;
   transition: background 0.2s ease;
 }
 
-.playlist-panel::-webkit-scrollbar-thumb:hover {
+.playlist-body::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 102, 241, 0.6);
 }
 
-.playlist-panel::-webkit-scrollbar-button {
+.playlist-body::-webkit-scrollbar-button {
   display: none;
 }
 
-.playlist-panel {
+.playlist-body {
+  overflow-y: auto;
   scrollbar-color: rgba(99, 102, 241, 0.4) rgba(245, 246, 251, 0.5);
   scrollbar-width: thin;
 }

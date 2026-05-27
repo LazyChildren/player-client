@@ -503,38 +503,40 @@ onUnmounted(() => {
       </div>
 
       <div class="content-grid">
-        <SidebarMenu />
-        <main class="main-panel">
-          <PlaylistView
-            :tracks="filteredTracks"
-            :activeTrackIndex="activeTrackIndex"
-            :currentTrackIndex="currentTrackIndex"
-            :isPlaying="isPlaying"
-            :playlistName="currentPlaylistName"
-            :loading="isLoadingTracks"
-            :errorMessage="trackLoadError"
-            @select="selectTrack"
-            @play="playTrack"
-            @refresh="fetchTracks"
-            @upload="openUploadPicker"
-          />
-          <PlayerFooter
-            :currentTrack="currentTrack"
-            :isPlaying="isPlaying"
-            :currentTime="currentTime"
-            :duration="duration"
-            :progress="progress"
-            :volume="volume"
-            :playbackOrder="playbackOrder"
-            @prev="prevTrack"
-            @playPause="playPause"
-            @next="nextTrack"
-            @seek="seek"
-            @set-volume="setVolume"
-            @toggle-mute="toggleMute"
-            @set-playback-order="setPlaybackOrder"
-          />
-        </main>
+        <div class="content-row">
+          <SidebarMenu />
+          <main class="main-panel">
+            <PlaylistView
+              :tracks="filteredTracks"
+              :activeTrackIndex="activeTrackIndex"
+              :currentTrackIndex="currentTrackIndex"
+              :isPlaying="isPlaying"
+              :playlistName="currentPlaylistName"
+              :loading="isLoadingTracks"
+              :errorMessage="trackLoadError"
+              @select="selectTrack"
+              @play="playTrack"
+              @refresh="fetchTracks"
+              @upload="openUploadPicker"
+            />
+          </main>
+        </div>
+        <PlayerFooter
+          :currentTrack="currentTrack"
+          :isPlaying="isPlaying"
+          :currentTime="currentTime"
+          :duration="duration"
+          :progress="progress"
+          :volume="volume"
+          :playbackOrder="playbackOrder"
+          @prev="prevTrack"
+          @playPause="playPause"
+          @next="nextTrack"
+          @seek="seek"
+          @set-volume="setVolume"
+          @toggle-mute="toggleMute"
+          @set-playback-order="setPlaybackOrder"
+        />
       </div>
     </div>
 
@@ -587,7 +589,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 0.5rem 0;
+  padding: 0rem 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -597,11 +599,20 @@ onUnmounted(() => {
 
 .content-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
   gap: 0;
   flex: 1;
   min-height: 0;
-  align-items: stretch;
+  height: 100%;
+  overflow: hidden;
+}
+
+.content-row {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .main-panel {
@@ -609,8 +620,10 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0;
   min-height: 0;
-  padding-bottom: 0;
+  height: 100%;
+  overflow: hidden;
 }
+
 
 .titlebar {
   display: flex;
@@ -680,72 +693,8 @@ onUnmounted(() => {
   .titlebar-search-input {
     width: min(420px, 100%);
   }
-}
 
-@media (max-width: 720px) {
-  .titlebar {
-    padding: 0.2rem 0.6rem 0.35rem;
-    gap: 0.5rem;
-  }
-
-  .titlebar-center {
-    justify-content: flex-start;
-  }
-
-  .titlebar-search-input {
-    width: 100%;
-  }
-
-  .titlebar-right {
-    margin-left: auto;
-  }
-}
-
-@media (max-width: 560px) {
-  .titlebar-center {
-    min-width: 0;
-  }
-
-  .titlebar-search-input {
-    min-width: 0;
-    padding: 0.42rem 0.78rem;
-  }
-
-  .titlebar-right {
-    width: auto;
-  }
-}
-
-@media (max-width: 430px) {
-  .titlebar {
-    flex-wrap: wrap;
-  }
-
-  .titlebar-center,
-  .titlebar-right {
-    width: 100%;
-    flex: 1 1 100%;
-  }
-
-  .titlebar-right {
-    justify-content: flex-end;
-  }
-
-  .titlebar-center {
-    order: 1;
-  }
-
-  .titlebar-right {
-    order: 2;
-  }
-
-  .titlebar-search-input {
-    width: 100%;
-  }
-}
-
-@media (max-width: 1024px) {
-  .content-grid {
+  .content-row {
     grid-template-columns: 1fr;
   }
 }
@@ -783,11 +732,4 @@ body,
   border: 0;
 }
 
-.app-content .player-footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-}
 </style>
