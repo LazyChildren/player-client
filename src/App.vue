@@ -26,6 +26,11 @@ const duration = ref(0);
 const volume = ref(80);
 const previousVolume = ref(80);
 const audioRef = ref<HTMLAudioElement | null>(null);
+const playbackOrder = ref<'loop' | 'one' | 'shuffle'>('loop');
+
+// shuffle queue state: permutation of indices when in shuffle mode
+const shuffleQueue = ref<number[]>([]);
+const shufflePos = ref(0);
 const isSettingsOpen = ref(false);
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
@@ -110,12 +115,30 @@ function playPause() {
 
 function prevTrack() {
   if (!tracks.value.length) return;
+  if (playbackOrder.value === 'shuffle') {
+    if (!shuffleQueue.value.length) ensureShuffleQueue();
+    shufflePos.value = (shufflePos.value - 1 + shuffleQueue.value.length) % shuffleQueue.value.length;
+    const idx = shuffleQueue.value[shufflePos.value];
+    currentTrackIndex.value = idx;
+    activeTrackIndex.value = idx;
+    return;
+  }
+
   currentTrackIndex.value = (currentTrackIndex.value - 1 + tracks.value.length) % tracks.value.length;
   activeTrackIndex.value = currentTrackIndex.value;
 }
 
 function nextTrack() {
   if (!tracks.value.length) return;
+  if (playbackOrder.value === 'shuffle') {
+    if (!shuffleQueue.value.length) ensureShuffleQueue();
+    shufflePos.value = (shufflePos.value + 1) % shuffleQueue.value.length;
+    const idx = shuffleQueue.value[shufflePos.value];
+    currentTrackIndex.value = idx;
+    activeTrackIndex.value = idx;
+    return;
+  }
+
   currentTrackIndex.value = (currentTrackIndex.value + 1) % tracks.value.length;
   activeTrackIndex.value = currentTrackIndex.value;
 }
@@ -128,6 +151,39 @@ function playTrack(index: number) {
   activeTrackIndex.value = index;
   currentTrackIndex.value = index;
   isPlaying.value = true;
+  if (playbackOrder.value === 'shuffle') {
+    if (!shuffleQueue.value.length) ensureShuffleQueue();
+    const pos = shuffleQueue.value.indexOf(index);
+    shufflePos.value = pos >= 0 ? pos : 0;
+  }
+}
+
+function setPlaybackOrder(order: 'loop' | 'one' | 'shuffle') {
+  playbackOrder.value = order;
+  if (order === 'shuffle') {
+    ensureShuffleQueue();
+    const pos = shuffleQueue.value.indexOf(currentTrackIndex.value);
+    shufflePos.value = pos >= 0 ? pos : 0;
+  }
+}
+
+function ensureShuffleQueue() {
+  const n = tracks.value.length;
+  if (n === 0) {
+    shuffleQueue.value = [];
+    shufflePos.value = 0;
+    return;
+  }
+  const arr = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  shuffleQueue.value = arr;
+  const pos = shuffleQueue.value.indexOf(currentTrackIndex.value);
+  shufflePos.value = pos >= 0 ? pos : 0;
 }
 
 function seek(value: number) {
@@ -322,6 +378,8 @@ async function fetchTracks() {
     const loadedTracks = await invoke<Track[]>("fetch_music_list");
     tracks.value = loadedTracks;
 
+    if (playbackOrder.value === 'shuffle') ensureShuffleQueue();
+
     if (!loadedTracks.length) {
       currentTrackIndex.value = 0;
       activeTrackIndex.value = 0;
@@ -390,7 +448,21 @@ onMounted(() => {
   audioRef.value.addEventListener("pause", () => {
     isPlaying.value = false;
   });
-  audioRef.value.addEventListener("ended", nextTrack);
+  audioRef.value.addEventListener("ended", () => {
+    if (playbackOrder.value === 'one') {
+      if (!audioRef.value) return;
+      audioRef.value.currentTime = 0;
+      isPlaying.value = true;
+      void audioRef.value.play();
+      return;
+    }
+
+    // for shuffle and loop, advance and play
+    nextTrack();
+    // ensure state indicates playing so watch handlers also trigger play
+    isPlaying.value = true;
+    void audioRef.value?.play();
+  });
 });
 
 onUnmounted(() => {
@@ -436,12 +508,14 @@ onUnmounted(() => {
             :duration="duration"
             :progress="progress"
             :volume="volume"
+            :playbackOrder="playbackOrder"
             @prev="prevTrack"
             @playPause="playPause"
             @next="nextTrack"
             @seek="seek"
             @set-volume="setVolume"
             @toggle-mute="toggleMute"
+            @set-playback-order="setPlaybackOrder"
           />
         </main>
       </div>

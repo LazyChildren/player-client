@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Track } from "../types/music";
+import { ref, watch } from "vue";
 
 const props = defineProps<{
   currentTrack: Track | undefined;
@@ -8,6 +9,7 @@ const props = defineProps<{
   duration: number;
   progress: number;
   volume: number;
+  playbackOrder: "loop" | "one" | "shuffle";
 }>();
 
 const emit = defineEmits<{
@@ -17,6 +19,8 @@ const emit = defineEmits<{
   (event: "seek", value: number): void;
   (event: "set-volume", value: number): void;
   (event: "toggle-mute"): void;
+  (event: "cycle-playback-order"): void;
+  (event: "set-playback-order", value: "loop" | "one" | "shuffle"): void;
 }>();
 
 function onSeek(event: Event) {
@@ -33,6 +37,36 @@ function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
+}
+
+// local reactive playback order so the button updates immediately
+const playbackOrderLocal = ref<string>(props.playbackOrder ?? "loop");
+
+watch(
+  () => props.playbackOrder,
+  (v) => {
+    if (v) playbackOrderLocal.value = v;
+  }
+);
+
+function onPlaybackOrderClick() {
+  const orderSeq = ["loop", "one", "shuffle"] as const;
+  const idx = orderSeq.indexOf(playbackOrderLocal.value as any);
+  const next = orderSeq[(idx + 1) % orderSeq.length];
+  playbackOrderLocal.value = next;
+  emit("set-playback-order", next);
+  emit("cycle-playback-order");
+}
+
+function playbackOrderTitle() {
+  switch (playbackOrderLocal.value) {
+    case "one":
+      return "Single repeat";
+    case "shuffle":
+      return "Shuffle";
+    default:
+      return "Loop";
+  }
 }
 </script>
 
@@ -122,6 +156,23 @@ function formatTime(seconds: number) {
             <span class="volume-value">{{ props.volume }}%</span>
           </div>
         </div>
+
+        <button
+          @click="onPlaybackOrderClick"
+          class="order-button"
+          :title="playbackOrderTitle()"
+          type="button"
+        >
+          <template v-if="playbackOrderLocal === 'loop'">
+            <svg t="1779862180737" class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M192 789.333333a21.24 21.24 0 0 1-12.8-4.28 344.513333 344.513333 0 0 1-99.333333-118A341.246667 341.246667 0 0 1 384 170.666667h256q6.36 0 12.733333 0.233333l-49.153333-49.146667a21.333333 21.333333 0 0 1 30.173333-30.173333l85.333334 85.333333a21.333333 21.333333 0 0 1 0 30.173334l-85.333334 85.333333a21.333333 21.333333 0 0 1-30.173333-30.173333l48.666667-48.666667Q646.126667 213.333333 640 213.333333H384c-164.666667 0-298.666667 134-298.666667 298.666667 0 94.833333 43.546667 181.933333 119.48 238.966667A21.333333 21.333333 0 0 1 192 789.333333z m228.433333 143.06a21.333333 21.333333 0 0 0 0-30.173333l-49.153333-49.146667q6.366667 0.233333 12.733333 0.233334H640a341.46 341.46 0 0 0 304.146667-496.42 344.513333 344.513333 0 0 0-99.333334-118 21.333333 21.333333 0 1 0-25.626666 34.113333C895.12 330.066667 938.666667 417.166667 938.666667 512c0 164.666667-134 298.666667-298.666667 298.666667H384q-6.12 0-12.246667-0.246667l48.666667-48.666667a21.333333 21.333333 0 0 0-30.173333-30.173333l-85.333334 85.333333a21.333333 21.333333 0 0 0 0 30.173334l85.333334 85.333333a21.333333 21.333333 0 0 0 30.173333 0z" fill="currentColor"></path></svg>
+          </template>
+          <template v-else-if="playbackOrderLocal === 'one'">
+            <svg t="1779862228397" class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M192 789.333333a21.24 21.24 0 0 1-12.8-4.28 344.513333 344.513333 0 0 1-99.333333-118A341.246667 341.246667 0 0 1 384 170.666667h256q6.36 0 12.733333 0.233333l-49.153333-49.146667a21.333333 21.333333 0 0 1 30.173333-30.173333l85.333334 85.333333a21.333333 21.333333 0 0 1 0 30.173334l-85.333334 85.333333a21.333333 21.333333 0 0 1-30.173333-30.173333l48.666667-48.666667Q646.126667 213.333333 640 213.333333H384c-164.666667 0-298.666667 134-298.666667 298.666667 0 94.833333 43.546667 181.933333 119.48 238.966667A21.333333 21.333333 0 0 1 192 789.333333z m228.433333 143.06a21.333333 21.333333 0 0 0 0-30.173333l-49.153333-49.146667q6.366667 0.233333 12.733333 0.233334H640a341.46 341.46 0 0 0 304.146667-496.42 344.513333 344.513333 0 0 0-99.333334-118 21.333333 21.333333 0 1 0-25.626666 34.113333C895.12 330.066667 938.666667 417.166667 938.666667 512c0 164.666667-134 298.666667-298.666667 298.666667H384q-6.12 0-12.246667-0.246667l48.666667-48.666667a21.333333 21.333333 0 0 0-30.173333-30.173333l-85.333334 85.333333a21.333333 21.333333 0 0 0 0 30.173334l85.333334 85.333333a21.333333 21.333333 0 0 0 30.173333 0zM554.666667 618.666667V405.333333a21.333333 21.333333 0 0 0-21.333334-21.333333h-42.666666a21.333333 21.333333 0 0 0 0 42.666667h21.333333v192a21.333333 21.333333 0 0 0 42.666667 0z" fill="currentColor"></path></svg>
+          </template>
+          <template v-else>
+            <svg t="1779862281809" class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M682.48 297.633333L332.666667 752.386667A149.333333 149.333333 0 0 1 214.306667 810.666667H64a21.333333 21.333333 0 0 1 0-42.666667h150.306667a107.333333 107.333333 0 0 0 84.546666-41.633333L648.666667 271.613333A149.333333 149.333333 0 0 1 767.026667 213.333333h141.473333l-48.92-48.913333a21.333333 21.333333 0 0 1 30.173333-30.173333l85.333334 85.333333a21.333333 21.333333 0 0 1 0 30.173333l-85.333334 85.333334a21.333333 21.333333 0 0 1-30.173333-30.173334l48.92-48.913333h-141.473333a107.333333 107.333333 0 0 0-84.546667 41.633333zM64 256h150.306667a107.333333 107.333333 0 0 1 84.546666 41.633333l109.26 142.04a21.333333 21.333333 0 0 0 33.82-26L332.666667 271.613333A149.333333 149.333333 0 0 0 214.306667 213.333333H64a21.333333 21.333333 0 0 0 0 42.666667z m825.753333 432.913333a21.333333 21.333333 0 0 0-30.173333 30.173334l48.92 48.913333h-141.473333a107.333333 107.333333 0 0 1-84.546667-41.633333L573.22 584.326667a21.333333 21.333333 0 0 0-33.82 26L648.666667 752.386667a149.333333 149.333333 0 0 0 118.36 58.28h141.473333l-48.92 48.913333a21.333333 21.333333 0 0 0 30.173333 30.173333l85.333334-85.333333a21.333333 21.333333 0 0 0 0-30.173333z" fill="currentColor"></path></svg>
+          </template>
+        </button>
 
         <div class="time-labels" aria-label="Playback time">
           <span>{{ formatTime(props.currentTime) }}</span>
@@ -309,6 +360,31 @@ function formatTime(seconds: number) {
 }
 
 .volume-button .icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.order-button {
+  all: unset;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #6b7280;
+  background: rgba(79, 70, 229, 0.08);
+  margin-left: 0.5rem;
+}
+
+.order-button:hover {
+  background: rgba(79, 70, 229, 0.14);
+  color: #4338ca;
+  transform: translateY(-1px);
+}
+
+.order-button .icon {
   width: 18px;
   height: 18px;
   display: block;
