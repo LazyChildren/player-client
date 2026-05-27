@@ -1,12 +1,26 @@
-export type Mp3Metadata = {
+export type AudioMetadata = {
   title: string;
   artist: string;
 };
 
 const ID3_HEADER_SIZE = 10;
 const ID3V1_TAG_SIZE = 128;
+const OGG_HEADER = [0x4f, 0x67, 0x67, 0x53];
+const VORBIS_COMMENT_HEADER = [0x03, 0x76, 0x6f, 0x72, 0x62, 0x69, 0x73];
 
-export async function parseMp3Metadata(file: File): Promise<Mp3Metadata> {
+export async function parseAudioMetadata(file: File): Promise<AudioMetadata> {
+  const name = file.name.toLowerCase();
+  const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const isOgg = name.endsWith(".ogg") || isOggHeader(header);
+
+  if (isOgg) {
+    return parseOggMetadata(file);
+  }
+
+  return parseMp3Metadata(file);
+}
+
+export async function parseMp3Metadata(file: File): Promise<AudioMetadata> {
   const id3v2 = await parseId3v2(file);
 
   if (id3v2.title || id3v2.artist) {
@@ -16,7 +30,7 @@ export async function parseMp3Metadata(file: File): Promise<Mp3Metadata> {
   return parseId3v1(file);
 }
 
-async function parseId3v2(file: File): Promise<Mp3Metadata> {
+async function parseId3v2(file: File): Promise<AudioMetadata> {
   const headerBuffer = await file.slice(0, ID3_HEADER_SIZE).arrayBuffer();
   const header = new Uint8Array(headerBuffer);
 
@@ -67,7 +81,7 @@ async function parseId3v2(file: File): Promise<Mp3Metadata> {
   return { title, artist };
 }
 
-async function parseId3v1(file: File): Promise<Mp3Metadata> {
+async function parseId3v1(file: File): Promise<AudioMetadata> {
   if (file.size < ID3V1_TAG_SIZE) {
     return { title: "", artist: "" };
   }
@@ -87,6 +101,96 @@ async function parseId3v1(file: File): Promise<Mp3Metadata> {
 
 function isId3v2Header(bytes: Uint8Array) {
   return bytes.length >= ID3_HEADER_SIZE && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33;
+}
+
+function isOggHeader(bytes: Uint8Array, offset = 0) {
+  return (
+    bytes.length >= offset + 4 &&
+    bytes[offset] === OGG_HEADER[0] &&
+    bytes[offset + 1] === OGG_HEADER[1] &&
+    bytes[offset + 2] === OGG_HEADER[2] &&
+    bytes[offset + 3] === OGG_HEADER[3]
+  );
+}
+
+function findVorbisCommentHeader(bytes: Uint8Array) {
+  for (let i = 0; i + VORBIS_COMMENT_HEADER.length <= bytes.length; i += 1) {
+    let match = true;
+    for (let j = 0; j < VORBIS_COMMENT_HEADER.length; j += 1) {
+      if (bytes[i + j] !== VORBIS_COMMENT_HEADER[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+async function parseOggMetadata(file: File): Promise<AudioMetadata> {
+  const maxBytes = Math.min(file.size, 256 * 1024);
+  const buffer = await file.slice(0, maxBytes).arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  if (!isOggHeader(bytes)) {
+    return { title: "", artist: "" };
+  }
+
+  const idx = findVorbisCommentHeader(bytes);
+  if (idx < 0) {
+    return { title: "", artist: "" };
+  }
+
+  const data = bytes.slice(idx + VORBIS_COMMENT_HEADER.length);
+  if (data.length < 8) {
+    return { title: "", artist: "" };
+  }
+
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 0;
+
+  const vendorLength = view.getUint32(offset, true);
+  offset += 4 + vendorLength;
+
+  if (offset + 4 > data.length) {
+    return { title: "", artist: "" };
+  }
+
+  const commentCount = view.getUint32(offset, true);
+  offset += 4;
+
+  let title = "";
+  let artist = "";
+  const decoder = new TextDecoder();
+
+  for (let i = 0; i < commentCount; i += 1) {
+    if (offset + 4 > data.length) break;
+    const commentLength = view.getUint32(offset, true);
+    offset += 4;
+    if (offset + commentLength > data.length) break;
+
+    const comment = decoder.decode(data.slice(offset, offset + commentLength));
+    offset += commentLength;
+
+    const [key, ...valueParts] = comment.split("=");
+    if (!key) continue;
+
+    const value = valueParts.join("=");
+    const normalizeKey = key.trim().toLowerCase();
+    if (!title && normalizeKey === "title") {
+      title = value.trim();
+    } else if (!artist && normalizeKey === "artist") {
+      artist = value.trim();
+    }
+
+    if (title && artist) {
+      break;
+    }
+  }
+
+  return { title, artist };
 }
 
 function decodeSynchsafeInteger(bytes: Uint8Array) {

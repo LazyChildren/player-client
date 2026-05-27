@@ -8,7 +8,7 @@ import SettingsDialog from "./components/SettingsDialog.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
-import { parseMp3Metadata } from "./utils/mp3Metadata";
+import { parseAudioMetadata } from "./utils/audioMetadata.ts";
 import type { AppSettings, Track } from "./types/music";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -288,15 +288,15 @@ async function handleUploadFileChange(event: Event) {
 
   if (!file) return;
 
-  if (!file.name.toLowerCase().endsWith(".mp3")) {
+  if (!file.name.toLowerCase().endsWith(".mp3") && !file.name.toLowerCase().endsWith(".ogg")) {
     input.value = "";
-    showUploadAlert("请选择 MP3 格式的音乐文件");
+    showUploadAlert("请选择 MP3 或 OGG 格式的音乐文件");
     return;
   }
 
-  const fallbackName = file.name.replace(/\.mp3$/i, "");
-  const metadata = await parseMp3Metadata(file).catch((error) => {
-    console.error("Failed to parse mp3 metadata", error);
+  const fallbackName = file.name.replace(/\.(mp3|ogg)$/i, "");
+  const metadata = await parseAudioMetadata(file).catch((error: unknown) => {
+    console.error("Failed to parse audio metadata", error);
     return { title: "", artist: "" };
   });
   const fallback = parseUploadFileName(file.name);
@@ -559,7 +559,7 @@ onUnmounted(() => {
     <input
       ref="uploadFileInputRef"
       type="file"
-      accept=".mp3,audio/mpeg"
+      accept=".mp3,.ogg,audio/mpeg,audio/ogg"
       class="hidden-upload-input"
       @change="handleUploadFileChange"
     />
