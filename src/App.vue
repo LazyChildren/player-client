@@ -14,6 +14,8 @@ import type { AppSettings, Track } from "./types/music";
 const DEFAULT_SETTINGS: AppSettings = {
   serverIp: "127.0.0.1",
   serverPort: "3000",
+  volume: 80,
+  playbackOrder: "loop",
 };
 
 const tracks = ref<Track[]>([]);
@@ -85,6 +87,8 @@ async function saveSettings(settings: AppSettings) {
   savedSettings.value = {
     serverIp: settings.serverIp,
     serverPort: settings.serverPort,
+    volume: volume.value,
+    playbackOrder: playbackOrder.value,
   };
 
   try {
@@ -92,6 +96,8 @@ async function saveSettings(settings: AppSettings) {
       settings: {
         server_ip: savedSettings.value.serverIp,
         server_port: savedSettings.value.serverPort,
+        volume: savedSettings.value.volume,
+        playback_order: savedSettings.value.playbackOrder,
       },
     });
     await fetchTracks();
@@ -435,10 +441,18 @@ onMounted(() => {
       savedSettings.value = {
         serverIp: loaded.serverIp || DEFAULT_SETTINGS.serverIp,
         serverPort: loaded.serverPort || DEFAULT_SETTINGS.serverPort,
+        volume: loaded.volume ?? DEFAULT_SETTINGS.volume,
+        playbackOrder: loaded.playbackOrder || DEFAULT_SETTINGS.playbackOrder,
       };
+      
+      // 应用加载的音量和播放顺序
+      volume.value = savedSettings.value.volume ?? 80;
+      playbackOrder.value = savedSettings.value.playbackOrder ?? "loop";
     } catch (error) {
       console.error("Failed to load settings", error);
       savedSettings.value = { ...DEFAULT_SETTINGS };
+      volume.value = DEFAULT_SETTINGS.volume ?? 80;
+      playbackOrder.value = DEFAULT_SETTINGS.playbackOrder ?? "loop";
     }
 
     await fetchTracks();

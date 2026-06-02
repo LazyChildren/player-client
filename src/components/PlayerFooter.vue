@@ -61,11 +61,11 @@ function onPlaybackOrderClick() {
 function playbackOrderTitle() {
   switch (playbackOrderLocal.value) {
     case "one":
-      return "Single repeat";
+      return "单曲循环";
     case "shuffle":
-      return "Shuffle";
+      return "随机播放";
     default:
-      return "Loop";
+      return "循环播放";
   }
 }
 </script>
@@ -83,13 +83,13 @@ function playbackOrderTitle() {
       </div>
 
       <div class="player-controls">
-        <button @click="emit('prev')" class="control-button" title="Previous track" type="button">
+        <button @click="emit('prev')" class="control-button" title="上一首" type="button">
           <svg class="icon" viewBox="0 0 1024 1024" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
             <path d="M803.584 134.592c-18.176-10.048-39.936-10.112-58.112 0L192 443.008l0-282.88c0-17.664-14.336-32-32-32S128 142.464 128 160.128l0 344.896C127.744 507.2 127.104 509.248 127.104 511.488S127.744 515.84 128 518.016l0 346.112c0 17.664 14.336 32 32 32s32-14.336 32-32L192 579.968l553.408 308.352C754.56 893.44 764.48 896 774.528 896s19.968-2.56 29.056-7.616c18.176-10.112 28.992-28.224 28.992-48.576L832.576 183.104C832.576 162.88 821.76 144.768 803.584 134.592zM768.192 829.248 198.016 511.488 771.328 192 768.192 829.248z" />
           </svg>
         </button>
 
-        <button @click="emit('playPause')" class="control-button primary" :title="props.isPlaying ? 'Pause' : 'Play'" type="button">
+        <button @click="emit('playPause')" class="control-button primary" :title="props.isPlaying ? '暂停' : '播放'" type="button">
           <template v-if="props.isPlaying">
             <svg class="icon" viewBox="0 0 1024 1024" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
               <path d="M288 128C270.336 128 256 142.336 256 160l0 768C256 945.664 270.336 960 288 960S320 945.664 320 928l0-768C320 142.336 305.664 128 288 128zM672 128C654.336 128 640 142.336 640 160l0 768c0 17.664 14.336 32 32 32s32-14.336 32-32l0-768C704 142.336 689.664 128 672 128z" />
@@ -102,7 +102,7 @@ function playbackOrderTitle() {
           </template>
         </button>
 
-        <button @click="emit('next')" class="control-button" title="Next track" type="button">
+        <button @click="emit('next')" class="control-button" title="下一首" type="button">
           <svg class="icon" viewBox="0 0 1024 1024" width="20" height="20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
             <path d="M832 160.128c0-17.664-14.336-32-32-32S768 142.464 768 160.128l0 282.88L214.592 134.592c-18.176-10.112-39.936-10.048-58.112 0C138.24 144.768 127.424 162.88 127.424 183.168l0 656.64c0 20.224 10.816 38.464 29.056 48.576C165.568 893.44 175.488 896 185.472 896s19.968-2.56 29.056-7.616L768 579.968l0 284.096c0 17.664 14.336 32 32 32s32-14.336 32-32L832 160.128zM191.808 829.248 188.672 192l573.312 319.488L191.808 829.248z" />
           </svg>
@@ -114,7 +114,7 @@ function playbackOrderTitle() {
           <button
             @click="emit('toggle-mute')"
             class="volume-button"
-            :title="props.volume === 0 ? 'Unmute' : 'Mute'"
+            :title="props.volume === 0 ? '取消静音' : '静音'"
             type="button"
           >
             <svg

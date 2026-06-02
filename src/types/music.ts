@@ -1,6 +1,8 @@
 export type AppSettings = {
   serverIp: string;
   serverPort: string;
+  volume?: number;
+  playbackOrder?: 'loop' | 'one' | 'shuffle';
 };
 
 export type Track = {
