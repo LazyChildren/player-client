@@ -77,8 +77,8 @@ function playbackOrderTitle() {
         <img v-if="props.currentTrack" class="player-cover" :src="props.currentTrack.coverUrl" :alt="props.currentTrack.title" />
         <div v-else class="player-cover placeholder"></div>
         <div class="player-meta">
-          <h2>{{ props.currentTrack?.title ?? "No track selected" }}</h2>
-          <p>{{ props.currentTrack?.artist ?? "Nothing is playing right now" }}</p>
+          <h2>{{ props.currentTrack?.title ?? "未选中歌曲" }}</h2>
+          <p>{{ props.currentTrack?.artist ?? "当前没有正在播放的歌曲" }}</p>
         </div>
       </div>
 
