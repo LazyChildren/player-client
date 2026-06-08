@@ -675,7 +675,6 @@ onUnmounted(() => {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   overflow: hidden;
 }
 
