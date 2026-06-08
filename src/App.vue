@@ -37,6 +37,7 @@ const isSettingsOpen = ref(false);
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
+const deletingTrackIds = ref<number[]>([]);
 const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
 const selectedUploadFile = ref<File | null>(null);
@@ -173,6 +174,58 @@ function playTrack(index: number) {
     if (!shuffleQueue.value.length) ensureShuffleQueue();
     const pos = shuffleQueue.value.indexOf(index);
     shufflePos.value = pos >= 0 ? pos : 0;
+  }
+}
+
+async function deleteTrack(index: number) {
+  if (index < 0 || index >= tracks.value.length) return;
+
+  const track = tracks.value[index];
+  const isCurrentTrackDeleted = index === currentTrackIndex.value;
+  const wasCurrentPlaying = isCurrentTrackDeleted && isPlaying.value;
+  const deletingId = track.id;
+
+  if (deletingTrackIds.value.includes(deletingId)) return;
+  deletingTrackIds.value.push(deletingId);
+
+  try {
+    if (wasCurrentPlaying && audioRef.value) {
+      audioRef.value.pause();
+    }
+
+    await invoke("delete_music", { id: track.id });
+
+    if (isCurrentTrackDeleted) {
+      isPlaying.value = false;
+    }
+
+    await fetchTracks();
+
+    ElMessage({
+      message: "歌曲已删除",
+      type: "success",
+      duration: 2200,
+      showClose: true,
+      grouping: false,
+      offset: 24,
+      zIndex: 20050,
+    });
+  } catch (error) {
+    if (wasCurrentPlaying && audioRef.value) {
+      audioRef.value.play().catch(() => {});
+    }
+    console.error("Failed to delete music", error);
+    ElMessage({
+      message: error instanceof Error && error.message ? error.message : "删除失败",
+      type: "error",
+      duration: 3000,
+      showClose: true,
+      grouping: false,
+      offset: 24,
+      zIndex: 20050,
+    });
+  } finally {
+    deletingTrackIds.value = deletingTrackIds.value.filter((id) => id !== deletingId);
   }
 }
 
@@ -391,6 +444,7 @@ async function handleUploadSong() {
 async function fetchTracks() {
   isLoadingTracks.value = true;
   trackLoadError.value = "";
+  const previousTrackId = currentTrack.value?.id;
 
   try {
     const loadedTracks = await invoke<Track[]>("fetch_music_list");
@@ -405,12 +459,24 @@ async function fetchTracks() {
       return;
     }
 
-    if (currentTrackIndex.value >= loadedTracks.length) {
+    if (previousTrackId != null) {
+      const preservedIndex = loadedTracks.findIndex((track) => track.id === previousTrackId);
+      if (preservedIndex !== -1) {
+        currentTrackIndex.value = preservedIndex;
+      } else if (currentTrackIndex.value >= loadedTracks.length) {
+        currentTrackIndex.value = 0;
+      }
+    } else if (currentTrackIndex.value >= loadedTracks.length) {
       currentTrackIndex.value = 0;
     }
 
     activeTrackIndex.value = currentTrackIndex.value;
-    applyTrack(loadedTracks[currentTrackIndex.value]);
+    const nextTrack = loadedTracks[currentTrackIndex.value];
+    const isSameTrack = previousTrackId != null && nextTrack.id === previousTrackId;
+
+    if (!isSameTrack) {
+      applyTrack(nextTrack);
+    }
 
     if (isPlaying.value) {
       await audioRef.value?.play();
@@ -528,8 +594,10 @@ onUnmounted(() => {
               :playlistName="currentPlaylistName"
               :loading="isLoadingTracks"
               :errorMessage="trackLoadError"
+              :deletingTrackIds="deletingTrackIds"
               @select="selectTrack"
               @play="playTrack"
+              @delete="deleteTrack"
               @refresh="fetchTracks"
               @upload="openUploadPicker"
             />

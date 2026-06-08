@@ -14,11 +14,13 @@ const props = defineProps<{
   playlistName: string;
   loading: boolean;
   errorMessage: string;
+  deletingTrackIds: number[];
 }>();
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
   (event: "play", index: number): void;
+  (event: "delete", index: number): void;
   (event: "refresh"): void;
   (event: "upload"): void;
 }>();
@@ -29,6 +31,10 @@ function selectTrack(index: number) {
 
 function playTrack(index: number) {
   emit("play", index);
+}
+
+function deleteTrack(index: number) {
+  emit("delete", index);
 }
 
 function refreshPlaylist() {
@@ -99,7 +105,7 @@ function openUploadDialog() {
       <span class="col-index">序号</span>
       <span class="col-title">标题</span>
       <span class="col-artist">艺术家</span>
-      <span class="col-duration">时长</span>
+      <span>操作</span>
     </div>
     <div class="playlist-body">
       <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
@@ -140,7 +146,34 @@ function openUploadDialog() {
             </div>
           </div>
           <span class="row-artist">{{ item.track.artist }}</span>
-          <span class="duration">{{ item.track.duration ?? "--:--" }}</span>
+          <span class="duration">
+            <button
+              type="button"
+              class="track-action-button delete-button"
+              :disabled="props.deletingTrackIds.includes(item.track.id)"
+              @click.stop="deleteTrack(item.originalIndex)"
+              :title="props.deletingTrackIds.includes(item.track.id) ? '正在删除' : '删除歌曲'"
+              :aria-label="props.deletingTrackIds.includes(item.track.id) ? '正在删除' : '删除歌曲'"
+            >
+              <template v-if="props.deletingTrackIds.includes(item.track.id)">
+                <span class="delete-spinner" aria-hidden="true"></span>
+              </template>
+              <template v-else>
+                <svg
+                  class="icon"
+                  viewBox="0 0 1024 1024"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                >
+                  <path
+                    d="M202.666667 256h-42.666667a32 32 0 0 1 0-64h704a32 32 0 0 1 0 64H266.666667v565.333333a53.333333 53.333333 0 0 0 53.333333 53.333334h384a53.333333 53.333333 0 0 0 53.333333-53.333334V352a32 32 0 0 1 64 0v469.333333c0 64.8-52.533333 117.333333-117.333333 117.333334H320c-64.8 0-117.333333-52.533333-117.333333-117.333334V256z m224-106.666667a32 32 0 0 1 0-64h170.666666a32 32 0 0 1 0 64H426.666667z m-32 288a32 32 0 0 1 64 0v256a32 32 0 0 1-64 0V437.333333z m170.666666 0a32 32 0 0 1 64 0v256a32 32 0 0 1-64 0V437.333333z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </template>
+            </button>
+          </span>
         </li>
       </ul>
     </div>
@@ -188,6 +221,8 @@ function openUploadDialog() {
   overflow-y: auto;
   scrollbar-color: rgba(99, 102, 241, 0.4) rgba(245, 246, 251, 0.5);
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
 }
 
 .playlist-header {
@@ -309,6 +344,13 @@ function openUploadDialog() {
   color: #8e95a1;
   font-size: 0.82rem;
   font-weight: 400;
+}
+
+.col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: center;
 }
 
 .col-index {
@@ -443,6 +485,53 @@ function openUploadDialog() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: center;
+  width: 100%;
+}
+
+.track-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  transition: transform 0.15s ease;
+  padding: 0.8rem;
+}
+
+.track-action-button:hover {
+  transform: translateY(-1px);
+}
+.track-action-button:disabled {
+  cursor: not-allowed;
+}
+
+.delete-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: delete-spinner-spin 0.8s linear infinite;
+}
+
+@keyframes delete-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.track-action-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
 }
 
 .row-artist {

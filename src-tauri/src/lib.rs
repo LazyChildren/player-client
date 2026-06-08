@@ -109,6 +109,41 @@ struct UploadResponse {
     data: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct DeleteResponse {
+    code: String,
+    msg: String,
+}
+
+#[tauri::command]
+async fn delete_music(app: tauri::AppHandle, id: i64) -> Result<(), String> {
+    let settings = load_settings(app.clone())?;
+    let base_url = build_base_url(&settings);
+    let url = format!("{}/music/delete", base_url.trim_end_matches('/'));
+
+    let response = reqwest::Client::new()
+        .get(&url)
+        .query(&[("id", id.to_string())])
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let payload = response
+        .json::<DeleteResponse>()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if payload.code != "200" {
+        return Err(if payload.msg.trim().is_empty() {
+            "删除失败".to_string()
+        } else {
+            payload.msg
+        });
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 async fn fetch_music_list(app: tauri::AppHandle) -> Result<Vec<MusicTrack>, String> {
     let settings = load_settings(app.clone())?;
@@ -232,7 +267,8 @@ pub fn run() {
             save_settings,
             fetch_music_list,
             fetch_cover_url,
-            upload_music
+            upload_music,
+            delete_music
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
