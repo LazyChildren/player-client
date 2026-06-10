@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   serverPort: "3000",
   volume: 80,
   playbackOrder: "loop",
+  closeWindowBehavior: "minimize",
 };
 
 const tracks = ref<Track[]>([]);
@@ -90,6 +91,7 @@ async function saveSettings(settings: AppSettings) {
     serverPort: settings.serverPort,
     volume: volume.value,
     playbackOrder: playbackOrder.value,
+    closeWindowBehavior: settings.closeWindowBehavior || "minimize",
   };
 
   try {
@@ -99,6 +101,7 @@ async function saveSettings(settings: AppSettings) {
         server_port: savedSettings.value.serverPort,
         volume: savedSettings.value.volume,
         playback_order: savedSettings.value.playbackOrder,
+        close_window_behavior: savedSettings.value.closeWindowBehavior,
       },
     });
     await fetchTracks();
@@ -509,6 +512,7 @@ onMounted(() => {
         serverPort: loaded.serverPort || DEFAULT_SETTINGS.serverPort,
         volume: loaded.volume ?? DEFAULT_SETTINGS.volume,
         playbackOrder: loaded.playbackOrder || DEFAULT_SETTINGS.playbackOrder,
+        closeWindowBehavior: loaded.closeWindowBehavior || DEFAULT_SETTINGS.closeWindowBehavior,
       };
       
       // 应用加载的音量和播放顺序

@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { reactive, watch } from "vue";
+import type { AppSettings } from "../types/music";
 
-type Settings = {
-  serverIp: string;
-  serverPort: string;
-};
+type Settings = AppSettings;
 
 const props = defineProps<{
   open: boolean;
@@ -19,11 +17,13 @@ const emit = defineEmits<{
 const draft = reactive<Settings>({
   serverIp: "",
   serverPort: "",
+  closeWindowBehavior: "minimize",
 });
 
 function syncDraft(settings: Settings) {
   draft.serverIp = settings.serverIp;
   draft.serverPort = settings.serverPort;
+  draft.closeWindowBehavior = settings.closeWindowBehavior || "minimize";
 }
 
 watch(
@@ -50,6 +50,7 @@ function handleSave() {
   emit("save", {
     serverIp: draft.serverIp.trim(),
     serverPort: draft.serverPort.trim(),
+    closeWindowBehavior: draft.closeWindowBehavior,
   });
 }
 
@@ -86,6 +87,28 @@ function handleCancel() {
               <span>端口</span>
               <input v-model="draft.serverPort" type="text" placeholder="例如 3000" />
             </label>
+
+            <fieldset class="setting-field">
+              <legend>关闭窗口行为</legend>
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="draft.closeWindowBehavior" 
+                  value="minimize"
+                  name="closeWindowBehavior"
+                />
+                <span>最小化到托盘</span>
+              </label>
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="draft.closeWindowBehavior" 
+                  value="exit"
+                  name="closeWindowBehavior"
+                />
+                <span>直接关闭应用程序</span>
+              </label>
+            </fieldset>
           </div>
 
           <footer class="settings-actions">
@@ -201,6 +224,51 @@ function handleCancel() {
   border-color: rgba(79, 70, 229, 0.55);
   background: #fff;
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.setting-field fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.setting-field legend {
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+  padding: 0;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.6rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio-option input[type="radio"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+  accent-color: #4f46e5;
+  flex-shrink: 0;
+  outline: none;
+  box-shadow: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.radio-option input[type="radio"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.radio-option span {
+  font-weight: 400;
+  color: #334155;
 }
 
 .settings-actions {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-music",
+  "productName": "simple-music",
   "version": "0.1.0",
-  "identifier": "com.lazychildren.tauri-music",
+  "identifier": "com.lazychildren.simple-music",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-music",
+        "title": "simple-music",
         "width": 1400,
         "height": 900,
         "minWidth": 1400,

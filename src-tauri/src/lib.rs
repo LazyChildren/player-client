@@ -10,6 +10,8 @@ struct AppSettings {
     server_ip: String,
     #[serde(alias = "server_port")]
     server_port: String,
+    #[serde(default, alias = "close_window_behavior")]
+    close_window_behavior: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -17,6 +19,7 @@ impl Default for AppSettings {
         Self {
             server_ip: "127.0.0.1".to_string(),
             server_port: "3000".to_string(),
+            close_window_behavior: Some("minimize".to_string()),
         }
     }
 }
@@ -95,6 +98,14 @@ struct QueryAllResponse {
     data: Vec<MusicRecord>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct DeleteResponse {
+    code: String,
+    msg: String,
+}
+
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct CoverUrlResponse {
     code: String,
@@ -102,17 +113,12 @@ struct CoverUrlResponse {
     data: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct UploadResponse {
     code: String,
     msg: String,
     data: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DeleteResponse {
-    code: String,
-    msg: String,
 }
 
 #[tauri::command]
@@ -258,6 +264,13 @@ async fn upload_music(
     Ok(())
 }
 
+#[tauri::command]
+fn hide_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -268,8 +281,91 @@ pub fn run() {
             fetch_music_list,
             fetch_cover_url,
             upload_music,
-            delete_music
+            delete_music,
+            hide_window
         ])
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                use tauri::tray::TrayIconBuilder;
+                use tauri::menu::MenuBuilder;
+                
+                let handle = app.handle();
+                
+                let menu = MenuBuilder::new(handle)
+                    .text("show", "打开")
+                    .text("quit", "退出")
+                    .build();
+                
+                match menu {
+                    Ok(menu) => {
+                        let default_icon = app.default_window_icon().unwrap().clone();
+                        let _ = TrayIconBuilder::new()
+                            .menu(&menu)
+                            .tooltip("simple-music")
+                            .icon(default_icon)
+                            .show_menu_on_left_click(false)
+                            .on_tray_icon_event(|tray, event| {
+                                use tauri::tray::TrayIconEvent;
+                                use tauri::tray::MouseButton;
+                                
+                                if let TrayIconEvent::Click {
+                                    button: mouse_button,
+                                    ..
+                                } = event
+                                {
+                                    match mouse_button {
+                                        MouseButton::Left => {
+                                            let app = tray.app_handle();
+                                            if let Some(window) = app.get_webview_window("main") {
+                                                let _ = window.show();
+                                                let _ = window.set_focus();
+                                            }
+                                        }
+                                        MouseButton::Right => {
+                                            // 右键点击：让系统自动弹出菜单，无需处理
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            })
+                            .build(handle);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create tray menu: {}", e);
+                    }
+                }
+            }
+            
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            match event.id.as_ref() {
+                "quit" => {
+                    app.exit(0);
+                },
+                "show" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                },
+                _ => {}
+            }
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app_handle = window.app_handle();
+                if let Ok(settings) = load_settings(app_handle.clone()) {
+                    let behavior = settings.close_window_behavior.as_deref().unwrap_or("minimize");
+                    if behavior == "minimize" {
+                        api.prevent_close();
+                        let _ = window.hide();
+                        return;
+                    }
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

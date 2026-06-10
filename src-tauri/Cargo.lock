@@ -3361,6 +3361,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
 
 [[package]]
+name = "simple-music"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3711,19 +3724,6 @@ dependencies = [
  "syn 2.0.117",
  "tauri-codegen",
  "tauri-utils",
-]
-
-[[package]]
-name = "tauri-music"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
 ]
 
 [[package]]

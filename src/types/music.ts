@@ -3,6 +3,7 @@ export type AppSettings = {
   serverPort: string;
   volume?: number;
   playbackOrder?: 'loop' | 'one' | 'shuffle';
+  closeWindowBehavior?: 'minimize' | 'exit';
 };
 
 export type Track = {

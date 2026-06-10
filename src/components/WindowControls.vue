@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, type Window as TauriWindow } from "@tauri-apps/api/window";
 import { onMounted, onUnmounted, ref } from "vue";
+import type { AppSettings } from "../types/music";
 
 const emit = defineEmits<{
   (event: "open-settings"): void;
@@ -88,7 +90,22 @@ async function toggleMaximize() {
 
 async function closeWindow() {
   if (!(await ensureWindowHandle())) return;
-  await windowHandle?.close();
+  
+  try {
+    const settings = await invoke<AppSettings>("load_settings");
+    const behavior = settings.closeWindowBehavior || "minimize";
+    
+    if (behavior === "minimize") {
+      // 隐藏到托盘
+      await invoke("hide_window");
+    } else {
+      // 直接关闭应用
+      await windowHandle?.close();
+    }
+  } catch (error) {
+    console.warn("Failed to load settings, defaulting to hide", error);
+    await invoke("hide_window");
+  }
 }
 </script>
 
