@@ -1,0 +1,84 @@
+/* Shared dark palette also reaches dialogs teleported to body. */
+:root[data-theme="dark"] {
+  --theme-bg: #14171f;
+  --theme-panel: #1b202b;
+  --theme-raised: #242b38;
+  --theme-input: #171c26;
+  --theme-text: #e2e8f0;
+  --theme-muted: #a0aec0;
+  --theme-border: #354052;
+  --theme-accent: #a5a7ff;
+  --theme-tint: rgba(129, 140, 248, 0.15);
+  --theme-hover: rgba(129, 140, 248, 0.22);
+  color: var(--theme-text);
+}
+
+:root[data-theme="dark"] .app-shell { background: var(--theme-bg); }
+:root[data-theme="dark"] .sidebar { background: #171b24; }
+:root[data-theme="dark"] :is(.playlist-panel, .track-table-header, .player-footer, .settings-dialog, .upload-dialog) {
+  background: var(--theme-panel);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+:root[data-theme="dark"] :is(.settings-dialog, .upload-dialog) {
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] :is(.settings-overlay, .upload-overlay) { background: rgba(0, 0, 0, 0.6); }
+:root[data-theme="dark"] :is(.settings-header, .upload-header) {
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.12), rgba(56, 189, 248, 0.04));
+}
+:root[data-theme="dark"] :is(.playlist-title, .track-title, .player-info-card, .settings-header h2, .upload-header h2, .setting-field, .radio-option span, .upload-field) {
+  color: var(--theme-text);
+}
+:root[data-theme="dark"] :is(.playlist-count, .track-table-header, .row-index, .row-artist, .duration, .player-meta p, .time-labels, .volume-value, .group-label, .settings-eyebrow, .upload-eyebrow, .upload-file-name, .cover-hint, .dialog-close-button, .playlist-refresh-button, .track-action-button) {
+  color: var(--theme-muted);
+}
+:root[data-theme="dark"] .track-table-header { border-color: var(--theme-border); }
+:root[data-theme="dark"] :is(.titlebar-search-input, .setting-field input:not([type="radio"]), .upload-field input) {
+  background: var(--theme-input);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+:root[data-theme="dark"] input::placeholder { color: #7e8ba0; }
+:root[data-theme="dark"] :is(.titlebar-search-input, .setting-field input:not([type="radio"]), .upload-field input):focus {
+  background: var(--theme-input);
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px var(--theme-tint);
+}
+:root[data-theme="dark"] .upload-field input:disabled { background: var(--theme-raised); color: #7e8ba0; }
+:root[data-theme="dark"] .radio-option input { accent-color: #a5a7ff; }
+:root[data-theme="dark"] :is(.menu-item, .playlist-item) { background: var(--theme-raised); color: var(--theme-text); }
+:root[data-theme="dark"] :is(.menu-item.active, .playlist-item.active, .track-list li.active) { background: var(--theme-hover); color: var(--theme-accent); }
+:root[data-theme="dark"] :is(.menu-item:hover, .playlist-item:hover, .track-list li:hover) { background: var(--theme-tint); }
+:root[data-theme="dark"] :is(.eyebrow, .playing-bars) { color: var(--theme-accent); }
+:root[data-theme="dark"] :is(.cover-preview, .player-cover, .player-cover.placeholder) { background: var(--theme-raised); }
+:root[data-theme="dark"] .cover-frame { background: var(--theme-input); color: var(--theme-muted); border-color: var(--theme-border); }
+:root[data-theme="dark"] .playlist-state { background: var(--theme-tint); color: var(--theme-muted); }
+:root[data-theme="dark"] .playlist-state.error { background: rgba(248, 113, 113, 0.12); color: #fca5a5; }
+:root[data-theme="dark"] :is(.playlist-upload-button, .control-button, .control-button.primary, .volume-button, .order-button, .file-reselect-button, .cover-link-button) {
+  background: var(--theme-tint);
+  color: var(--theme-accent);
+}
+:root[data-theme="dark"] :is(.playlist-upload-button, .control-button, .volume-button, .order-button, .file-reselect-button, .cover-link-button):hover {
+  background: var(--theme-hover);
+  color: #c7d2fe;
+}
+:root[data-theme="dark"] .action-button.secondary { background: var(--theme-raised); color: var(--theme-text); }
+:root[data-theme="dark"] .action-button.secondary:hover { background: #323d50; }
+:root[data-theme="dark"] .action-button.primary { background: #6366d9; color: #fff; }
+:root[data-theme="dark"] .action-button.primary:hover { background: #7477e5; }
+:root[data-theme="dark"] :is(.dialog-close-button:hover, .playlist-refresh-button:hover:not(:disabled)) { background: var(--theme-hover); color: var(--theme-text); }
+:root[data-theme="dark"] .window-button { color: var(--theme-muted); }
+:root[data-theme="dark"] .window-button:hover { color: var(--theme-text); }
+:root[data-theme="dark"] .close-button { color: #f87171; }
+:root[data-theme="dark"] .close-button:hover { color: #fca5a5; }
+.window-button:focus-visible { outline: 2px solid #818cf8; outline-offset: -3px; border-radius: 4px; }
+:root[data-theme="dark"] .download-button:disabled { color: #566174; }
+:root[data-theme="dark"] .download-complete-icon { opacity: 0.7; }
+:root[data-theme="dark"] .volume-popover,
+:root[data-theme="dark"] .volume-popover::after { background: var(--theme-raised); border-color: var(--theme-border); }
+:root[data-theme="dark"] :is(.progress-slider, .volume-slider) { accent-color: #a5a7ff; }
+:root[data-theme="dark"] .playlist-body { scrollbar-color: #4c5670 var(--theme-panel); }
+:root[data-theme="dark"] .playlist-body::-webkit-scrollbar-track { background: var(--theme-panel); }
+:root[data-theme="dark"] .playlist-body::-webkit-scrollbar-thumb { background: #4c5670; }
+:root[data-theme="dark"] .playlist-body::-webkit-scrollbar-thumb:hover { background: #65708c; }

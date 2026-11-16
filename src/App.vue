@@ -769,8 +769,8 @@ onUnmounted(() => {
 }
 
 .titlebar-right {
-  width: 6.3rem;
-  flex: 0 0 6.3rem;
+  width: 10.5rem;
+  flex: 0 0 10.5rem;
   display: flex;
   justify-content: flex-end;
   -webkit-app-region: no-drag;
