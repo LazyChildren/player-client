@@ -11,6 +11,8 @@ pub fn run() {
             music::fetch_cover_url,
             music::upload_music,
             music::delete_music,
+            music::download_music,
+            music::resolve_local_music,
             window::hide_window
         ])
         .setup(tray::setup)

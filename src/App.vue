@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
@@ -39,6 +39,7 @@ const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
 const deletingTrackIds = ref<number[]>([]);
+const downloadingTrackIds = ref<number[]>([]);
 const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
 const selectedUploadFile = ref<File | null>(null);
@@ -87,6 +88,7 @@ function resetUploadSongDraft() {
 
 async function saveSettings(settings: AppSettings) {
   savedSettings.value = {
+    downloadDirectory: settings.downloadDirectory || "",
     serverIp: settings.serverIp,
     serverPort: settings.serverPort,
     volume: volume.value,
@@ -97,6 +99,7 @@ async function saveSettings(settings: AppSettings) {
   try {
     await invoke("save_settings", {
       settings: {
+        download_directory: savedSettings.value.downloadDirectory,
         server_ip: savedSettings.value.serverIp,
         server_port: savedSettings.value.serverPort,
         volume: savedSettings.value.volume,
@@ -112,25 +115,32 @@ async function saveSettings(settings: AppSettings) {
   closeSettings();
 }
 
-function applyTrack(track: Track | undefined) {
+let playbackRequest = 0;
+async function applyTrack(track: Track | undefined) {
   if (!audioRef.value || !track) return;
 
-  audioRef.value.src = track.src;
+  const request = ++playbackRequest;
+  track.localPath = await invoke<string | null>("resolve_local_music", { id: track.id, src: track.src }).catch(() => null);
+  if (request !== playbackRequest || !audioRef.value) return;
+  const source = track.localPath ? convertFileSrc(track.localPath) : track.src;
+  if (audioRef.value.getAttribute("src") === source) return;
+  audioRef.value.src = source;
   audioRef.value.load();
   currentTime.value = 0;
   duration.value = 0;
 }
 
 function loadTrack() {
-  applyTrack(currentTrack.value);
+  return applyTrack(currentTrack.value);
 }
 
-function playPause() {
+async function playPause() {
   if (!audioRef.value || !tracks.value.length) return;
 
   if (isPlaying.value) {
     audioRef.value.pause();
   } else {
+    await applyTrack(currentTrack.value);
     void audioRef.value.play();
   }
 }
@@ -170,6 +180,9 @@ function selectTrack(index: number) {
 }
 
 function playTrack(index: number) {
+  if (index === currentTrackIndex.value) {
+    void applyTrack(currentTrack.value).then(() => audioRef.value?.play());
+  }
   activeTrackIndex.value = index;
   currentTrackIndex.value = index;
   isPlaying.value = true;
@@ -177,6 +190,22 @@ function playTrack(index: number) {
     if (!shuffleQueue.value.length) ensureShuffleQueue();
     const pos = shuffleQueue.value.indexOf(index);
     shufflePos.value = pos >= 0 ? pos : 0;
+  }
+}
+
+async function downloadTrack(index: number) {
+  const track = tracks.value[index];
+  if (!track || downloadingTrackIds.value.includes(track.id)) return;
+  downloadingTrackIds.value.push(track.id);
+  try {
+    const localPath = await invoke<string>("download_music", { id: track.id, src: track.src });
+    const latest = tracks.value.find(item => item.id === track.id && item.src === track.src);
+    if (latest) latest.localPath = localPath;
+    ElMessage.success("歌曲已下载");
+  } catch (error) {
+    ElMessage.error(typeof error === "string" ? error : "下载失败，请稍后重试");
+  } finally {
+    downloadingTrackIds.value = downloadingTrackIds.value.filter(id => id !== track.id);
   }
 }
 
@@ -478,7 +507,7 @@ async function fetchTracks() {
     const isSameTrack = previousTrackId != null && nextTrack.id === previousTrackId;
 
     if (!isSameTrack) {
-      applyTrack(nextTrack);
+      await applyTrack(nextTrack);
     }
 
     if (isPlaying.value) {
@@ -496,9 +525,10 @@ async function fetchTracks() {
   }
 }
 
-watch(currentTrackIndex, () => {
-  loadTrack();
-  if (isPlaying.value) {
+watch(currentTrackIndex, async () => {
+  const shouldPlay = isPlaying.value;
+  await loadTrack();
+  if (shouldPlay) {
     void audioRef.value?.play();
   }
 });
@@ -508,6 +538,7 @@ onMounted(() => {
     try {
       const loaded = await invoke<AppSettings>("load_settings");
       savedSettings.value = {
+        downloadDirectory: loaded.downloadDirectory || "",
         serverIp: loaded.serverIp || DEFAULT_SETTINGS.serverIp,
         serverPort: loaded.serverPort || DEFAULT_SETTINGS.serverPort,
         volume: loaded.volume ?? DEFAULT_SETTINGS.volume,
@@ -553,11 +584,12 @@ onMounted(() => {
       return;
     }
 
-    // for shuffle and loop, advance and play
-    nextTrack();
-    // ensure state indicates playing so watch handlers also trigger play
+    const previousIndex = currentTrackIndex.value;
     isPlaying.value = true;
-    void audioRef.value?.play();
+    nextTrack();
+    if (previousIndex === currentTrackIndex.value) {
+      void applyTrack(currentTrack.value).then(() => audioRef.value?.play());
+    }
   });
 });
 
@@ -599,6 +631,8 @@ onUnmounted(() => {
               :loading="isLoadingTracks"
               :errorMessage="trackLoadError"
               :deletingTrackIds="deletingTrackIds"
+              :downloadingTrackIds="downloadingTrackIds"
+              @download="downloadTrack"
               @select="selectTrack"
               @play="playTrack"
               @delete="deleteTrack"

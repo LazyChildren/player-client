@@ -11,11 +11,14 @@ pub(crate) struct AppSettings {
     server_port: String,
     #[serde(default, alias = "close_window_behavior")]
     pub(crate) close_window_behavior: Option<String>,
+    #[serde(default, alias = "download_directory")]
+    pub(crate) download_directory: String,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            download_directory: String::new(),
             server_ip: "127.0.0.1".to_string(),
             server_port: "3000".to_string(),
             close_window_behavior: Some("minimize".to_string()),
@@ -69,4 +72,3 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Res
     let contents = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
     fs::write(path, contents).map_err(|error| error.to_string())
 }
-

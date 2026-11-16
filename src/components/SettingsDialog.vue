@@ -15,12 +15,14 @@ const emit = defineEmits<{
 }>();
 
 const draft = reactive<Settings>({
+  downloadDirectory: "",
   serverIp: "",
   serverPort: "",
   closeWindowBehavior: "minimize",
 });
 
 function syncDraft(settings: Settings) {
+  draft.downloadDirectory = settings.downloadDirectory || "";
   draft.serverIp = settings.serverIp;
   draft.serverPort = settings.serverPort;
   draft.closeWindowBehavior = settings.closeWindowBehavior || "minimize";
@@ -48,6 +50,7 @@ watch(
 
 function handleSave() {
   emit("save", {
+    downloadDirectory: draft.downloadDirectory?.trim() || "",
     serverIp: draft.serverIp.trim(),
     serverPort: draft.serverPort.trim(),
     closeWindowBehavior: draft.closeWindowBehavior,
@@ -86,6 +89,11 @@ function handleCancel() {
             <label class="setting-field">
               <span>端口</span>
               <input v-model="draft.serverPort" type="text" placeholder="例如 3000" />
+            </label>
+
+            <label class="setting-field">
+              <span>歌曲下载目录</span>
+              <input v-model="draft.downloadDirectory" type="text" placeholder="留空使用系统下载目录 / Simple Music" />
             </label>
 
             <fieldset class="setting-field">

@@ -15,12 +15,14 @@ const props = defineProps<{
   loading: boolean;
   errorMessage: string;
   deletingTrackIds: number[];
+  downloadingTrackIds: number[];
 }>();
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
   (event: "play", index: number): void;
   (event: "delete", index: number): void;
+  (event: "download", index: number): void;
   (event: "refresh"): void;
   (event: "upload"): void;
 }>();
@@ -101,13 +103,13 @@ function openUploadDialog() {
       </div>
     </div>
 
-    <div class="track-table-header">
-      <span class="col-index">序号</span>
-      <span class="col-title">标题</span>
-      <span class="col-artist">艺术家</span>
-      <span>操作</span>
-    </div>
     <div class="playlist-body">
+      <div class="track-table-header">
+        <span class="col-index">序号</span>
+        <span class="col-title">标题</span>
+        <span class="col-artist">艺术家</span>
+        <span class="col-actions">操作</span>
+      </div>
       <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
       <div v-else-if="props.errorMessage" class="playlist-state error">{{ props.errorMessage }}</div>
       <div v-else-if="!props.tracks.length" class="playlist-state">暂无可播放的音乐数据</div>
@@ -140,13 +142,30 @@ function openUploadDialog() {
             <template v-else>{{ index + 1 }}</template>
           </span>
           <div class="track-item">
-            <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
+            <span class="cover-container">
+              <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
+              <svg v-if="item.track.localPath" class="downloaded-badge" viewBox="0 0 1024 1024" role="img" aria-label="已下载" xmlns="http://www.w3.org/2000/svg">
+                <path d="M459.755102 637.387755c-5.22449 0-10.44898-2.089796-14.628571-6.269388l-104.489796-104.489796c-8.359184-8.359184-8.359184-21.420408 0-29.779591 8.359184-8.359184 21.420408-8.359184 29.779592 0l104.489795 104.489796c8.359184 8.359184 8.359184 21.420408 0 29.779591-4.702041 4.179592-9.926531 6.269388-15.15102 6.269388z" fill="#cdcdcd" />
+                <path d="M459.755102 637.387755c-5.22449 0-10.44898-2.089796-14.628571-6.269388-8.359184-8.359184-8.359184-21.420408 0-29.779591l208.979591-208.979592c8.359184-8.359184 21.420408-8.359184 29.779592 0 8.359184 8.359184 8.359184 21.420408 0 29.779592l-208.979592 208.979591c-4.702041 4.179592-9.926531 6.269388-15.15102 6.269388z" fill="#cdcdcd" />
+                <path d="M512 929.959184c-230.4 0-417.959184-187.559184-417.959184-417.959184s187.559184-417.959184 417.959184-417.959184 417.959184 187.559184 417.959184 417.959184-187.559184 417.959184-417.959184 417.959184z m0-794.122449c-207.412245 0-376.163265 168.75102-376.163265 376.163265s168.75102 376.163265 376.163265 376.163265 376.163265-168.75102 376.163265-376.163265-168.75102-376.163265-376.163265-376.163265z" fill="#cdcdcd" />
+              </svg>
+            </span>
             <div class="track-meta">
               <p class="track-title">{{ item.track.title }}</p>
             </div>
           </div>
           <span class="row-artist">{{ item.track.artist }}</span>
           <span class="duration">
+            <button type="button" class="track-action-button download-button" :disabled="props.downloadingTrackIds.includes(item.track.id) || !!item.track.localPath" :aria-busy="props.downloadingTrackIds.includes(item.track.id)" :title="item.track.localPath ? '已下载' : props.downloadingTrackIds.includes(item.track.id) ? '正在下载' : '下载歌曲'" aria-label="下载歌曲" @click.stop="emit('download', item.originalIndex)" @dblclick.stop>
+              <span v-if="props.downloadingTrackIds.includes(item.track.id)" class="delete-spinner" aria-hidden="true"></span>
+              <svg v-else-if="item.track.localPath" class="download-complete-icon" viewBox="0 0 1024 1024" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M512 244.345V665 M325.191 495.515L514.124 665L703.058 495.515 M197.113 779.655H826.889" fill="none" stroke="#bfbfbf" stroke-width="42" stroke-linejoin="round" />
+                <path d="M842.633 338.812c-86.956 0-157.443-70.487-157.443-157.443s70.487-157.443 157.443-157.443 157.443 70.487 157.443 157.443-70.487 157.443-157.443 157.443zM780.41 164.615l-13.319 14.485 59.813 54.916 87.916-84.941-13.682-14.138-74.581 72.046-46.147-42.353z" fill="#bfbfbf" />
+              </svg>
+              <svg v-else viewBox="0 0 1024 1024" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M544.256 605.184l244.224-244.224a31.744 31.744 0 0 1 45.056 45.056l-295.424 295.424a36.864 36.864 0 0 1-51.2 0L190.464 406.528a31.744 31.744 0 1 1 45.056-45.056l244.224 244.224V111.104a32.256 32.256 0 1 1 64 0zM153.6 902.656a32.256 32.256 0 0 1 0-64h716.8a32.256 32.256 0 0 1 0 64z" fill="currentColor" />
+              </svg>
+            </button>
             <button
               type="button"
               class="track-action-button delete-button"
@@ -182,6 +201,7 @@ function openUploadDialog() {
 
 <style scoped>
 .playlist-panel {
+  --track-columns: 48px minmax(0, 1.1fr) minmax(0, 1fr) 120px;
   background: rgba(255, 255, 255, 0.88);
   border-radius: 0;
   padding: 0.7rem;
@@ -335,8 +355,13 @@ function openUploadDialog() {
 }
 
 .track-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  margin-bottom: 0.6rem;
   display: grid;
-  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
+  grid-template-columns: var(--track-columns);
   align-items: center;
   gap: 0.75rem;
   padding: 0 0.9rem 0.35rem;
@@ -347,10 +372,7 @@ function openUploadDialog() {
 }
 
 .col-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  justify-self: center;
+  padding-left: 0.375rem;
 }
 
 .col-index {
@@ -385,7 +407,7 @@ function openUploadDialog() {
 
 .track-list li {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
+  grid-template-columns: var(--track-columns);
   align-items: center;
   gap: 0.75rem;
   padding: 0.3rem 0;
@@ -465,6 +487,8 @@ function openUploadDialog() {
   font-size: 0.92rem;
 }
 
+.cover-container { position: relative; width: 3rem; height: 3rem; flex-shrink: 0; }
+.downloaded-badge { position: absolute; right: -3px; bottom: -3px; width: 17px; height: 17px; background: #374151; border-radius: 50%; }
 .cover-preview {
   width: 3rem;
   height: 3rem;
@@ -505,7 +529,20 @@ function openUploadDialog() {
   cursor: pointer;
   color: #6b7280;
   transition: transform 0.15s ease;
-  padding: 0.8rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex: 0 0 28px;
+}
+
+.track-action-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.track-action-button .download-complete-icon {
+  width: 23px;
+  height: 23px;
 }
 
 .track-action-button:hover {
@@ -515,9 +552,14 @@ function openUploadDialog() {
   cursor: not-allowed;
 }
 
+.download-button:disabled {
+  color: #cbd5e1;
+  transform: none;
+}
+
 .delete-spinner {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
@@ -545,6 +587,9 @@ function openUploadDialog() {
 }
 
 .duration {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   color: #8a8a8a;
   font-size: 0.86rem;
   font-weight: 400;
