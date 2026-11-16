@@ -4,7 +4,7 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
 import PlaylistView from "./components/PlaylistView.vue";
-import SettingsDialog from "./components/SettingsDialog.vue";
+import SettingsView from "./views/SettingsView.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
@@ -34,7 +34,19 @@ const playbackOrder = ref<'loop' | 'one' | 'shuffle'>('loop');
 // shuffle queue state: permutation of indices when in shuffle mode
 const shuffleQueue = ref<number[]>([]);
 const shufflePos = ref(0);
-const isSettingsOpen = ref(false);
+const currentPage = ref(window.location.hash === "#/settings" ? "settings" : "playlist");
+const isSavingSettings = ref(false);
+function syncPage() {
+  currentPage.value = window.location.hash === "#/settings" ? "settings" : "playlist";
+  if (currentPage.value === "playlist") {
+    void flushSettings().then(() => {
+      if (playlistNeedsRefresh) {
+        playlistNeedsRefresh = false;
+        void fetchTracks();
+      }
+    });
+  }
+}
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
@@ -68,11 +80,12 @@ const filteredTracks = computed(() => {
 });
 
 function openSettings() {
-  isSettingsOpen.value = true;
+  window.location.hash = "/settings";
 }
 
 function closeSettings() {
-  isSettingsOpen.value = false;
+  void flushSettings();
+  window.location.hash = "/";
 }
 
 function resetUploadSongDraft() {
@@ -86,33 +99,45 @@ function resetUploadSongDraft() {
   selectedUploadFile.value = null;
 }
 
-async function saveSettings(settings: AppSettings) {
-  savedSettings.value = {
-    downloadDirectory: settings.downloadDirectory || "",
-    serverIp: settings.serverIp,
-    serverPort: settings.serverPort,
-    volume: volume.value,
-    playbackOrder: playbackOrder.value,
-    closeWindowBehavior: settings.closeWindowBehavior || "minimize",
-  };
+let settingsTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingSettings: AppSettings | null = null;
+let settingsSaveChain: Promise<void> = Promise.resolve();
+let playlistNeedsRefresh = false;
 
-  try {
-    await invoke("save_settings", {
-      settings: {
-        download_directory: savedSettings.value.downloadDirectory,
-        server_ip: savedSettings.value.serverIp,
-        server_port: savedSettings.value.serverPort,
-        volume: savedSettings.value.volume,
-        playback_order: savedSettings.value.playbackOrder,
-        close_window_behavior: savedSettings.value.closeWindowBehavior,
-      },
-    });
-    await fetchTracks();
-  } catch (error) {
-    console.error("Failed to save settings", error);
-  }
+function saveSettings(settings: AppSettings) {
+  pendingSettings = { ...settings };
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => { void flushSettings(); }, 400);
+}
 
-  closeSettings();
+function flushSettings(): Promise<void> {
+  clearTimeout(settingsTimer);
+  settingsTimer = undefined;
+  const pending = pendingSettings;
+  pendingSettings = null;
+  if (!pending) return settingsSaveChain;
+  // Serialize writes so an older request can never overwrite the latest edit.
+  settingsSaveChain = settingsSaveChain.then(async () => {
+    isSavingSettings.value = true;
+    const nextSettings: AppSettings = {
+      ...pending,
+      volume: volume.value,
+      playbackOrder: playbackOrder.value,
+      closeWindowBehavior: pending.closeWindowBehavior || "minimize",
+    };
+    try {
+      await invoke("save_settings", { settings: nextSettings });
+      playlistNeedsRefresh ||= nextSettings.serverIp !== savedSettings.value.serverIp
+        || nextSettings.serverPort !== savedSettings.value.serverPort
+        || nextSettings.downloadDirectory !== savedSettings.value.downloadDirectory;
+      savedSettings.value = nextSettings;
+    } catch (error) {
+      ElMessage.error(typeof error === "string" ? error : "自动保存失败，请重新修改后重试");
+    } finally {
+      isSavingSettings.value = false;
+    }
+  });
+  return settingsSaveChain;
 }
 
 let playbackRequest = 0;
@@ -534,6 +559,7 @@ watch(currentTrackIndex, async () => {
 });
 
 onMounted(() => {
+  window.addEventListener("hashchange", syncPage);
   void (async () => {
     try {
       const loaded = await invoke<AppSettings>("load_settings");
@@ -594,6 +620,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("hashchange", syncPage);
   if (!audioRef.value) return;
   audioRef.value.pause();
   audioRef.value.src = "";
@@ -620,9 +647,10 @@ onUnmounted(() => {
 
       <div class="content-grid">
         <div class="content-row">
-          <SidebarMenu />
+          <SidebarMenu :active="currentPage === 'playlist'" @open-playlist="closeSettings" />
           <main class="main-panel">
-            <PlaylistView
+            <SettingsView v-if="currentPage === 'settings'" :initialSettings="savedSettings" :saving="isSavingSettings" @save="saveSettings" @cancel="closeSettings" />
+            <PlaylistView v-else
               :tracks="filteredTracks"
               :activeTrackIndex="activeTrackIndex"
               :currentTrackIndex="currentTrackIndex"
@@ -659,13 +687,6 @@ onUnmounted(() => {
         />
       </div>
     </div>
-
-    <SettingsDialog
-      :open="isSettingsOpen"
-      :initialSettings="savedSettings"
-      @save="saveSettings"
-      @cancel="closeSettings"
-    />
 
     <UploadSongDialog
       :open="isUploadDialogOpen"

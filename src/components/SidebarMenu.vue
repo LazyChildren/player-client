@@ -1,8 +1,13 @@
-﻿<template>
+﻿<script setup lang="ts">
+defineProps<{ active: boolean }>();
+const emit = defineEmits<{ (event: "open-playlist"): void }>();
+</script>
+
+<template>
   <aside class="sidebar">
     <div class="playlist-group">
       <p class="eyebrow">收藏夹</p>
-      <button class="playlist-item active">默认收藏夹</button>
+      <button class="playlist-item" :class="{ active }" @click="emit('open-playlist')">默认收藏夹</button>
     </div>
   </aside>
 </template>

@@ -15,12 +15,12 @@
 
 :root[data-theme="dark"] .app-shell { background: var(--theme-bg); }
 :root[data-theme="dark"] .sidebar { background: #171b24; }
-:root[data-theme="dark"] :is(.playlist-panel, .track-table-header, .player-footer, .settings-dialog, .upload-dialog) {
+:root[data-theme="dark"] :is(.playlist-panel, .track-table-header, .player-footer, .settings-page, .upload-dialog) {
   background: var(--theme-panel);
   color: var(--theme-text);
   border-color: var(--theme-border);
 }
-:root[data-theme="dark"] :is(.settings-dialog, .upload-dialog) {
+:root[data-theme="dark"] :is(.settings-page, .upload-dialog) {
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
 }
 :root[data-theme="dark"] :is(.settings-overlay, .upload-overlay) { background: rgba(0, 0, 0, 0.6); }
@@ -82,3 +82,6 @@
 :root[data-theme="dark"] .playlist-body::-webkit-scrollbar-track { background: var(--theme-panel); }
 :root[data-theme="dark"] .playlist-body::-webkit-scrollbar-thumb { background: #4c5670; }
 :root[data-theme="dark"] .playlist-body::-webkit-scrollbar-thumb:hover { background: #65708c; }
+
+:root[data-theme="dark"] .settings-hint { color: var(--theme-muted); }
+:root[data-theme="dark"] .settings-header { border-color: var(--theme-border); }
