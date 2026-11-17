@@ -21,6 +21,19 @@
         "transparent": true,
         "shadow": false,
         "resizable": true
+      },
+      {
+        "label": "tray",
+        "url": "index.html#/tray",
+        "title": "Simple Music 托盘菜单",
+        "width": 280,
+        "height": 460,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "shadow": true
       }
     ],
     "security": {

@@ -77,7 +77,8 @@
 :root[data-theme="dark"] .download-complete-icon { opacity: 0.7; }
 :root[data-theme="dark"] .volume-popover,
 :root[data-theme="dark"] .volume-popover::after { background: var(--theme-raised); border-color: var(--theme-border); }
-:root[data-theme="dark"] :is(.progress-slider, .volume-slider) { accent-color: #a5a7ff; }
+:root[data-theme="dark"] .progress-slider { accent-color: #e2e8f0; }
+:root[data-theme="dark"] .volume-slider { accent-color: #a5a7ff; }
 :root[data-theme="dark"] .playlist-body { scrollbar-color: #4c5670 var(--theme-panel); }
 :root[data-theme="dark"] .playlist-body::-webkit-scrollbar-track { background: var(--theme-panel); }
 :root[data-theme="dark"] .playlist-body::-webkit-scrollbar-thumb { background: #4c5670; }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
@@ -10,6 +11,7 @@ import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongD
 import WindowControls from "./components/WindowControls.vue";
 import BatchUploadDialog, { type BatchUploadItem } from "./components/BatchUploadDialog.vue";
 import { parseAudioMetadata } from "./utils/audioMetadata.ts";
+import { useTheme } from "./utils/theme";
 import type { AppSettings, Collection, Track } from "./types/music";
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -720,6 +722,41 @@ async function fetchTracks() {
   }
 }
 
+let stopTrayListener: UnlistenFn | undefined;
+const { theme: trayTheme } = useTheme();
+let trayReady = false;
+let appUnmounted = false;
+let traySyncChain: Promise<unknown> = Promise.resolve();
+function syncTrayState() {
+  if (!trayReady || appUnmounted) return;
+  const state = { playing: isPlaying.value, hasTracks: tracks.value.length > 0,
+    volume: Math.round(volume.value), playbackOrder: playbackOrder.value, theme: trayTheme.value };
+  traySyncChain = traySyncChain.then(() => invoke("sync_tray_state", state))
+    .catch(error => console.error("Failed to synchronize tray menu", error));
+}
+async function handleTrayControl(action: string) {
+  const volumeMatch = /^tray-volume-(\d{1,3})$/.exec(action);
+  if (volumeMatch) { setVolume(Number(volumeMatch[1])); syncTrayState(); return; }
+  switch (action) {
+    case "tray-previous": prevTrack(); break;
+    case "tray-next": nextTrack(); break;
+    case "tray-play-pause": await playPause(); break;
+    case "tray-mute": toggleMute(); break;
+    case "tray-volume-up": setVolume(volume.value + 10); break;
+    case "tray-volume-down": setVolume(volume.value - 10); break;
+    case "tray-volume-0": setVolume(0); break;
+    case "tray-volume-25": setVolume(25); break;
+    case "tray-volume-50": setVolume(50); break;
+    case "tray-volume-75": setVolume(75); break;
+    case "tray-volume-100": setVolume(100); break;
+    case "tray-mode-loop": setPlaybackOrder("loop"); break;
+    case "tray-mode-one": setPlaybackOrder("one"); break;
+    case "tray-mode-shuffle": setPlaybackOrder("shuffle"); break;
+  }
+  syncTrayState();
+}
+watch([isPlaying, volume, playbackOrder, () => tracks.value.length, trayTheme], syncTrayState, { flush: "post" });
+
 watch(currentTrackIndex, async () => {
   const shouldPlay = isPlaying.value;
   await loadTrack();
@@ -731,6 +768,17 @@ watch(currentTrackIndex, async () => {
 onMounted(() => {
   window.addEventListener("hashchange", syncPage);
   void (async () => {
+    try {
+      const unlisten = await listen<string>("tray-control", ({ payload }) => {
+        void handleTrayControl(payload).catch(error => console.error("Tray control failed", error));
+      });
+      if (appUnmounted) { unlisten(); return; }
+      stopTrayListener = unlisten;
+      trayReady = true;
+      syncTrayState();
+    } catch (error) {
+      console.error("Failed to register tray controls", error);
+    }
     try {
       const loaded = await invoke<AppSettings>("load_settings");
       savedSettings.value = {
@@ -790,6 +838,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  appUnmounted = true;
+  trayReady = false;
+  stopTrayListener?.();
   window.removeEventListener("hashchange", syncPage);
   if (!audioRef.value) return;
   audioRef.value.pause();
