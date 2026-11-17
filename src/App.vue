@@ -9,7 +9,7 @@ import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
 import { parseAudioMetadata } from "./utils/audioMetadata.ts";
-import type { AppSettings, Track } from "./types/music";
+import type { AppSettings, Collection, Track } from "./types/music";
 
 const DEFAULT_SETTINGS: AppSettings = {
   serverIp: "127.0.0.1",
@@ -22,7 +22,11 @@ const DEFAULT_SETTINGS: AppSettings = {
 const tracks = ref<Track[]>([]);
 const currentTrackIndex = ref(0);
 const activeTrackIndex = ref(0);
-const currentPlaylistName = ref("默认歌单");
+const collections = ref<Collection[]>([]);
+const selectedCollectionId = ref<number | null>(null);
+const currentPlaylistName = computed(() => collections.value.find(
+  (collection) => collection.id === selectedCollectionId.value,
+)?.collectionName ?? "收藏夹");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -42,7 +46,7 @@ function syncPage() {
     void flushSettings().then(() => {
       if (playlistNeedsRefresh) {
         playlistNeedsRefresh = false;
-        void fetchTracks();
+        void fetchCollections();
       }
     });
   }
@@ -343,6 +347,10 @@ function toggleMute() {
 }
 
 function openUploadPicker() {
+  if (selectedCollectionId.value === null) {
+    showUploadAlert("请先选择收藏夹");
+    return;
+  }
   uploadFileInputRef.value?.click();
 }
 
@@ -452,6 +460,11 @@ async function handleFetchCover() {
 }
 
 async function handleUploadSong() {
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null) {
+    showUploadAlert("请先选择收藏夹");
+    return;
+  }
   if (!selectedUploadFile.value) {
     showUploadAlert("请选择要上传的音乐文件");
     return;
@@ -463,6 +476,7 @@ async function handleUploadSong() {
     const fileBytes = Array.from(new Uint8Array(await selectedUploadFile.value.arrayBuffer()));
 
     await invoke("upload_music", {
+      collectionId,
       fileName: selectedUploadFile.value.name,
       fileBytes,
       musicName: uploadSongDraft.value.title.trim(),
@@ -498,21 +512,85 @@ async function handleUploadSong() {
   }
 }
 
+let trackListRequest = 0;
+
+function clearTracks() {
+  ++playbackRequest;
+  audioRef.value?.pause();
+  audioRef.value?.removeAttribute("src");
+  audioRef.value?.load();
+  tracks.value = [];
+  currentTrackIndex.value = 0;
+  activeTrackIndex.value = 0;
+  currentTime.value = 0;
+  duration.value = 0;
+  isPlaying.value = false;
+  shuffleQueue.value = [];
+}
+
+async function fetchCollections() {
+  const request = ++trackListRequest;
+  isLoadingTracks.value = true;
+  trackLoadError.value = "";
+  clearTracks();
+  collections.value = [];
+  selectedCollectionId.value = null;
+  try {
+    const loaded = await invoke<Collection[]>("fetch_collections");
+    if (request !== trackListRequest) return;
+    collections.value = loaded;
+    selectedCollectionId.value = loaded[0]?.id ?? null;
+    await fetchTracks();
+  } catch (error) {
+    if (request !== trackListRequest) return;
+    console.error("Failed to load collections", error);
+    trackLoadError.value = "收藏夹加载失败，请检查服务器设置后刷新重试。";
+  } finally {
+    if (request === trackListRequest) isLoadingTracks.value = false;
+  }
+}
+
+async function openCollection(collectionId: number) {
+  await flushSettings();
+  const needsRefresh = playlistNeedsRefresh;
+  playlistNeedsRefresh = false;
+  closeSettings();
+  if (needsRefresh) {
+    await fetchCollections();
+    return;
+  }
+  if (selectedCollectionId.value === collectionId) return;
+  selectedCollectionId.value = collectionId;
+  clearTracks();
+  await fetchTracks();
+}
+
+async function refreshPlaylist() {
+  if (!collections.value.length) await fetchCollections();
+  else await fetchTracks();
+}
+
 async function fetchTracks() {
+  const request = ++trackListRequest;
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null) {
+    clearTracks();
+    isLoadingTracks.value = false;
+    return;
+  }
   isLoadingTracks.value = true;
   trackLoadError.value = "";
   const previousTrackId = currentTrack.value?.id;
 
   try {
-    const loadedTracks = await invoke<Track[]>("fetch_music_list");
+    const loadedTracks = await invoke<Track[]>("fetch_music_list", { collectionId });
+    if (request !== trackListRequest) return;
     tracks.value = loadedTracks;
 
     if (playbackOrder.value === 'shuffle') ensureShuffleQueue();
 
     if (!loadedTracks.length) {
-      currentTrackIndex.value = 0;
-      activeTrackIndex.value = 0;
-      isPlaying.value = false;
+      clearTracks();
       return;
     }
 
@@ -539,14 +617,12 @@ async function fetchTracks() {
       await audioRef.value?.play();
     }
   } catch (error) {
+    if (request !== trackListRequest) return;
     console.error("Failed to load music list", error);
-    tracks.value = [];
-    currentTrackIndex.value = 0;
-    activeTrackIndex.value = 0;
-    isPlaying.value = false;
+    clearTracks();
     trackLoadError.value = "音乐列表加载失败，请检查服务器设置。";
   } finally {
-    isLoadingTracks.value = false;
+    if (request === trackListRequest) isLoadingTracks.value = false;
   }
 }
 
@@ -582,7 +658,7 @@ onMounted(() => {
       playbackOrder.value = DEFAULT_SETTINGS.playbackOrder ?? "loop";
     }
 
-    await fetchTracks();
+    await fetchCollections();
   })();
 
   if (!audioRef.value) return;
@@ -647,7 +723,8 @@ onUnmounted(() => {
 
       <div class="content-grid">
         <div class="content-row">
-          <SidebarMenu :active="currentPage === 'playlist'" @open-playlist="closeSettings" />
+          <SidebarMenu :active="currentPage === 'playlist'" :collections="collections"
+            :selectedCollectionId="selectedCollectionId" @open-playlist="openCollection" />
           <main class="main-panel">
             <SettingsView v-if="currentPage === 'settings'" :initialSettings="savedSettings" :saving="isSavingSettings" @save="saveSettings" @cancel="closeSettings" />
             <PlaylistView v-else
@@ -664,7 +741,7 @@ onUnmounted(() => {
               @select="selectTrack"
               @play="playTrack"
               @delete="deleteTrack"
-              @refresh="fetchTracks"
+              @refresh="refreshPlaylist"
               @upload="openUploadPicker"
             />
           </main>

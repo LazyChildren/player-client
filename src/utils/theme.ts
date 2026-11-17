@@ -20,8 +20,8 @@ export function initializeTheme() {
 }
 
 export function useTheme() {
-  function toggleTheme() {
-    theme.value = theme.value === "dark" ? "light" : "dark";
+  function setTheme(value: Theme) {
+    theme.value = value;
     applyTheme();
     try {
       localStorage.setItem(storageKey, theme.value);
@@ -29,5 +29,8 @@ export function useTheme() {
       // Switching still works when persistent storage is unavailable.
     }
   }
-  return { theme: readonly(theme), toggleTheme };
+  function toggleTheme() {
+    setTheme(theme.value === "dark" ? "light" : "dark");
+  }
+  return { theme: readonly(theme), setTheme, toggleTheme };
 }

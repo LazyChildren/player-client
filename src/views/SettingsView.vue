@@ -3,6 +3,9 @@ import { reactive, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { ElMessage } from "element-plus";
 import type { AppSettings } from "../types/music";
+import { useTheme } from "../utils/theme";
+
+const { theme, setTheme } = useTheme();
 
 const props = defineProps<{ initialSettings: AppSettings; saving: boolean }>();
 const emit = defineEmits<{
@@ -59,6 +62,13 @@ function handleSave() {
       </header>
       <fieldset class="settings-body">
         <p class="settings-hint" role="status">{{ saving ? '正在保存…' : '修改后自动保存' }}</p>
+        <fieldset class="setting-field">
+          <legend>主题</legend>
+          <div class="theme-options">
+            <label class="radio-option"><input :checked="theme === 'light'" type="radio" value="light" name="theme" @change="setTheme('light')" /><span>浅色</span></label>
+            <label class="radio-option"><input :checked="theme === 'dark'" type="radio" value="dark" name="theme" @change="setTheme('dark')" /><span>深色</span></label>
+          </div>
+        </fieldset>
         <label class="setting-field">
           <span>服务器 IP</span>
           <input v-model="draft.serverIp" required type="text" placeholder="例如 127.0.0.1" />
@@ -190,6 +200,14 @@ function handleSave() {
   font-weight: 600;
   margin-bottom: 0.45rem;
   padding: 0;
+}
+
+.theme-options {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1.5rem;
+  white-space: nowrap;
 }
 
 .radio-option {

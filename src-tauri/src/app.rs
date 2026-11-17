@@ -10,6 +10,7 @@ pub fn run() {
             settings::save_settings,
             settings::choose_download_directory,
             music::fetch_music_list,
+            music::fetch_collections,
             music::fetch_cover_url,
             music::upload_music,
             music::delete_music,

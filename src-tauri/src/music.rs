@@ -32,6 +32,41 @@ struct QueryAllResponse {
     data: Vec<MusicRecord>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Collection {
+    id: i64,
+    collection_name: String,
+    created_time: String,
+    modified_time: String,
+    valid: i32,
+}
+
+#[derive(Debug, Deserialize)]
+struct CollectionResponse {
+    code: String,
+    msg: String,
+    data: Vec<Collection>,
+}
+
+#[tauri::command]
+pub(crate) async fn fetch_collections(app: tauri::AppHandle) -> Result<Vec<Collection>, String> {
+    let settings = load_settings(app)?;
+    let url = format!("{}/collection/queryAll", build_base_url(&settings).trim_end_matches('/'));
+    let payload = reqwest::get(&url)
+        .await
+        .map_err(|error| error.to_string())?
+        .error_for_status()
+        .map_err(|error| error.to_string())?
+        .json::<CollectionResponse>()
+        .await
+        .map_err(|error| error.to_string())?;
+    if payload.code != "200" {
+        return Err(format!("{}: {}", payload.code, payload.msg));
+    }
+    Ok(payload.data)
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct DeleteResponse {
@@ -85,13 +120,18 @@ pub(crate) async fn delete_music(app: tauri::AppHandle, id: i64) -> Result<(), S
 }
 
 #[tauri::command]
-pub(crate) async fn fetch_music_list(app: tauri::AppHandle) -> Result<Vec<MusicTrack>, String> {
+pub(crate) async fn fetch_music_list(app: tauri::AppHandle, collection_id: i64) -> Result<Vec<MusicTrack>, String> {
     let settings = load_settings(app.clone())?;
     let base_url = build_base_url(&settings);
-    let url = format!("{}/music/queryAll", base_url.trim_end_matches('/'));
+    let url = format!("{}/music/queryByCollection", base_url.trim_end_matches('/'));
 
-    let response = reqwest::get(&url)
+    let response = reqwest::Client::new()
+        .get(&url)
+        .query(&[("collectionId", collection_id)])
+        .send()
         .await
+        .map_err(|error| error.to_string())?
+        .error_for_status()
         .map_err(|error| error.to_string())?;
     let payload = response
         .json::<QueryAllResponse>()
@@ -161,6 +201,7 @@ pub(crate) async fn fetch_cover_url(
 #[tauri::command]
 pub(crate) async fn upload_music(
     app: tauri::AppHandle,
+    collection_id: i64,
     file_name: String,
     file_bytes: Vec<u8>,
     music_name: String,
@@ -174,6 +215,7 @@ pub(crate) async fn upload_music(
     let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name);
     let form = reqwest::multipart::Form::new()
         .part("file", part)
+        .text("collectionId", collection_id.to_string())
         .text("musicName", music_name)
         .text("artist", artist)
         .text("coverUrl", cover_url);

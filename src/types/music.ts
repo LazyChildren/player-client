@@ -7,6 +7,14 @@ export type AppSettings = {
   closeWindowBehavior?: 'minimize' | 'exit';
 };
 
+export type Collection = {
+  id: number;
+  collectionName: string;
+  createdTime: string;
+  modifiedTime: string;
+  valid: number;
+};
+
 export type Track = {
   id: number;
   title: string;
