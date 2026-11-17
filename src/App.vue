@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
 import PlaylistView from "./components/PlaylistView.vue";
@@ -8,6 +8,7 @@ import SettingsView from "./views/SettingsView.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
+import BatchUploadDialog, { type BatchUploadItem } from "./components/BatchUploadDialog.vue";
 import { parseAudioMetadata } from "./utils/audioMetadata.ts";
 import type { AppSettings, Collection, Track } from "./types/music";
 
@@ -60,6 +61,42 @@ const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
 const selectedUploadFile = ref<File | null>(null);
 const isUploadingSong = ref(false);
+const isBatchDialogOpen = ref(false);
+const batchProgress = ref({ running: false, completed: 0, total: 0, failed: 0, current: "", errors: [] as string[] });
+const isUploadProgressOpen = ref(false);
+
+function openBatchUpload() {
+  if (isUploadingSong.value || batchProgress.value.running) return;
+  closeUploadDialog();
+  isBatchDialogOpen.value = true;
+}
+
+async function uploadBatch(items: BatchUploadItem[]) {
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null || batchProgress.value.running || !items.length) return;
+  isBatchDialogOpen.value = false;
+  isUploadProgressOpen.value = false;
+  batchProgress.value = { running: true, completed: 0, total: items.length, failed: 0, current: "", errors: [] };
+  for (const item of items) {
+    batchProgress.value.current = item.title;
+    try {
+      const coverUrl = await invoke<string>("fetch_cover_url", { musicName: item.title, artist: item.artist });
+      const fileBytes = Array.from(new Uint8Array(await item.file.arrayBuffer()));
+      await invoke("upload_music", { collectionId, fileName: item.file.name, fileBytes,
+        musicName: item.title, artist: item.artist, coverUrl });
+    } catch (error) {
+      batchProgress.value.failed++;
+      batchProgress.value.errors.push(`${item.title}：${String(error)}`);
+    } finally {
+      batchProgress.value.completed++;
+    }
+  }
+  batchProgress.value.running = false;
+  batchProgress.value.current = "";
+  ElMessage({ type: batchProgress.value.failed ? "warning" : "success",
+    message: `批量上传完成：成功 ${items.length - batchProgress.value.failed} 首，失败 ${batchProgress.value.failed} 首` });
+  if (selectedCollectionId.value === collectionId) await fetchTracks();
+}
 const uploadSongDraft = ref<UploadSongDraft>({
   fileName: "",
   filePath: "",
@@ -149,7 +186,7 @@ async function applyTrack(track: Track | undefined) {
   if (!audioRef.value || !track) return;
 
   const request = ++playbackRequest;
-  track.localPath = await invoke<string | null>("resolve_local_music", { id: track.id, src: track.src }).catch(() => null);
+  track.localPath = await invoke<string | null>("resolve_local_music", { id: track.id, src: track.src, title: track.title, artist: track.artist }).catch(() => null);
   if (request !== playbackRequest || !audioRef.value) return;
   const source = track.localPath ? convertFileSrc(track.localPath) : track.src;
   if (audioRef.value.getAttribute("src") === source) return;
@@ -225,9 +262,10 @@ function playTrack(index: number) {
 async function downloadTrack(index: number) {
   const track = tracks.value[index];
   if (!track || downloadingTrackIds.value.includes(track.id)) return;
+  if (deleteConfirmationOpen || deletingTrackIds.value.includes(track.id)) return;
   downloadingTrackIds.value.push(track.id);
   try {
-    const localPath = await invoke<string>("download_music", { id: track.id, src: track.src });
+    const localPath = await invoke<string>("download_music", { id: track.id, src: track.src, title: track.title, artist: track.artist });
     const latest = tracks.value.find(item => item.id === track.id && item.src === track.src);
     if (latest) latest.localPath = localPath;
     ElMessage.success("歌曲已下载");
@@ -238,58 +276,110 @@ async function downloadTrack(index: number) {
   }
 }
 
-async function deleteTrack(index: number) {
-  if (index < 0 || index >= tracks.value.length) return;
-
-  const track = tracks.value[index];
-  const isCurrentTrackDeleted = index === currentTrackIndex.value;
-  const wasCurrentPlaying = isCurrentTrackDeleted && isPlaying.value;
-  const deletingId = track.id;
-
-  if (deletingTrackIds.value.includes(deletingId)) return;
-  deletingTrackIds.value.push(deletingId);
-
+const isBatchDownloading = ref(false);
+const batchDownloadProgress = ref({ completed: 0, total: 0 });
+async function downloadTracks(ids: number[]) {
+  if (isBatchDownloading.value || deleteConfirmationOpen || isDeletingTracks.value) return;
+  const selected = tracks.value.filter(track => ids.includes(track.id)
+    && !downloadingTrackIds.value.includes(track.id) && !deletingTrackIds.value.includes(track.id));
+  if (!selected.length) return;
+  isBatchDownloading.value = true;
+  batchDownloadProgress.value = { completed: 0, total: selected.length };
+  downloadingTrackIds.value.push(...selected.map(track => track.id));
+  let succeeded = 0;
+  const errors: string[] = [];
   try {
-    if (wasCurrentPlaying && audioRef.value) {
-      audioRef.value.pause();
+    for (const track of selected) {
+      try {
+        const localPath = await invoke<string>("download_music", {
+          id: track.id, src: track.src, title: track.title, artist: track.artist,
+        });
+        const latest = tracks.value.find(item => item.id === track.id && item.src === track.src);
+        if (latest) latest.localPath = localPath;
+        succeeded++;
+      } catch (error) {
+        errors.push(`${track.title}：${String(error)}`);
+      } finally {
+        batchDownloadProgress.value.completed++;
+      }
     }
-
-    await invoke("delete_music", { id: track.id });
-
-    if (isCurrentTrackDeleted) {
-      isPlaying.value = false;
-    }
-
-    await fetchTracks();
-
-    ElMessage({
-      message: "歌曲已删除",
-      type: "success",
-      duration: 2200,
-      showClose: true,
-      grouping: false,
-      offset: 24,
-      zIndex: 20050,
-    });
-  } catch (error) {
-    if (wasCurrentPlaying && audioRef.value) {
-      audioRef.value.play().catch(() => {});
-    }
-    console.error("Failed to delete music", error);
-    ElMessage({
-      message: error instanceof Error && error.message ? error.message : "删除失败",
-      type: "error",
-      duration: 3000,
-      showClose: true,
-      grouping: false,
-      offset: 24,
-      zIndex: 20050,
-    });
+    ElMessage({ message: [`批量下载完成：成功 ${succeeded} 首，失败 ${errors.length} 首`, ...errors].join("；"),
+      type: errors.length ? "warning" : "success", duration: errors.length ? 6000 : 2500, showClose: true });
   } finally {
-    deletingTrackIds.value = deletingTrackIds.value.filter((id) => id !== deletingId);
+    const selectedIds = new Set(selected.map(track => track.id));
+    downloadingTrackIds.value = downloadingTrackIds.value.filter(id => !selectedIds.has(id));
+    isBatchDownloading.value = false;
   }
 }
 
+let deleteConfirmationOpen = false;
+const isDeletingTracks = ref(false);
+async function deleteTrack(index: number) {
+  const track = tracks.value[index];
+  if (track) await deleteTracks([track.id]);
+}
+
+async function deleteTracks(ids: number[]) {
+  if (deleteConfirmationOpen || isDeletingTracks.value) return;
+  const selected = tracks.value.filter(track => ids.includes(track.id));
+  if (!selected.length) return;
+  if (selected.some(track => downloadingTrackIds.value.includes(track.id))) {
+    ElMessage.warning("所选歌曲正在下载，请下载完成后再删除");
+    return;
+  }
+  if (selected.some(track => deletingTrackIds.value.includes(track.id))) return;
+  deleteConfirmationOpen = true;
+  try {
+    const description = selected.length === 1 ? `歌曲「${selected[0].title}」` : `所选的 ${selected.length} 首歌曲`;
+    await ElMessageBox.confirm(`确定删除${description}吗？已下载的本地文件也会一并删除。`, "删除歌曲", {
+      confirmButtonText: "确认删除", cancelButtonText: "取消", type: "warning", closeOnClickModal: false,
+    });
+  } catch {
+    return;
+  } finally {
+    deleteConfirmationOpen = false;
+  }
+  isDeletingTracks.value = true;
+  deletingTrackIds.value.push(...selected.map(track => track.id));
+  let succeeded = 0;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  try {
+    for (const track of selected) {
+      const isCurrent = currentTrack.value?.id === track.id;
+      const wasPlaying = isCurrent && isPlaying.value;
+      if (isCurrent && audioRef.value) {
+        ++playbackRequest;
+        audioRef.value.pause();
+        audioRef.value.removeAttribute("src");
+        audioRef.value.load();
+      }
+      try {
+        const warning = await invoke<string | null>("delete_music", { id: track.id, src: track.src });
+        succeeded++;
+        if (warning) warnings.push(`${track.title}：${warning}`);
+        if (isCurrent) isPlaying.value = false;
+      } catch (error) {
+        errors.push(`${track.title}：${String(error)}`);
+        if (wasPlaying && currentTrack.value?.id === track.id) {
+          await applyTrack(track);
+          void audioRef.value?.play().catch(() => {});
+        }
+      }
+    }
+    await fetchTracks();
+    const result = selected.length === 1
+      ? (succeeded ? "歌曲已删除" : "删除失败")
+      : `批量删除完成：成功 ${succeeded} 首，失败 ${errors.length} 首`;
+    ElMessage({ message: [result, ...errors, ...warnings].join("；"),
+      type: errors.length || warnings.length ? "warning" : "success",
+      duration: errors.length || warnings.length ? 6000 : 2500, showClose: true });
+  } finally {
+    const selectedIds = new Set(selected.map(track => track.id));
+    deletingTrackIds.value = deletingTrackIds.value.filter(id => !selectedIds.has(id));
+    isDeletingTracks.value = false;
+  }
+}
 function setPlaybackOrder(order: 'loop' | 'one' | 'shuffle') {
   playbackOrder.value = order;
   if (order === 'shuffle') {
@@ -347,11 +437,15 @@ function toggleMute() {
 }
 
 function openUploadPicker() {
+  if (batchProgress.value.running) {
+    showUploadAlert("批量上传正在后台执行，请等待当前任务完成");
+    return;
+  }
   if (selectedCollectionId.value === null) {
     showUploadAlert("请先选择收藏夹");
     return;
   }
-  uploadFileInputRef.value?.click();
+  isUploadDialogOpen.value = true;
 }
 
 function reselectUploadFile() {
@@ -387,7 +481,7 @@ function showUploadAlert(message: string) {
 }
 
 function parseUploadFileName(fileName: string) {
-  const baseName = fileName.replace(/\.mp3$/i, "").trim();
+  const baseName = fileName.replace(/\.(mp3|ogg)$/i, "").trim();
   const parts = baseName.split("-");
 
   if (parts.length < 2) {
@@ -736,14 +830,37 @@ onUnmounted(() => {
               :loading="isLoadingTracks"
               :errorMessage="trackLoadError"
               :deletingTrackIds="deletingTrackIds"
+              :deleting="isDeletingTracks"
+              :batchDownloading="isBatchDownloading"
+              :downloadProgress="`${batchDownloadProgress.completed} / ${batchDownloadProgress.total}`"
+              :collectionId="selectedCollectionId"
+              @batch-delete="deleteTracks"
+              @batch-download="downloadTracks"
               :downloadingTrackIds="downloadingTrackIds"
+              :batchUploading="batchProgress.running"
+              :hasUploadProgress="batchProgress.total > 0"
+              :uploadProgressOpen="isUploadProgressOpen"
+              @toggle-upload-progress="isUploadProgressOpen = !isUploadProgressOpen"
               @download="downloadTrack"
               @select="selectTrack"
               @play="playTrack"
               @delete="deleteTrack"
               @refresh="refreshPlaylist"
               @upload="openUploadPicker"
-            />
+            >
+              <template #upload-progress>
+    <aside v-if="batchProgress.total && isUploadProgressOpen" id="batch-upload-progress" class="batch-progress" role="status" aria-live="polite">
+      <div>{{ batchProgress.running ? '正在上传' : '上传完成' }} {{ batchProgress.completed }} / {{ batchProgress.total }}
+        <span v-if="batchProgress.failed">（失败 {{ batchProgress.failed }} 首）</span>
+      </div>
+      <progress :value="batchProgress.completed" :max="batchProgress.total"></progress>
+      <div v-if="batchProgress.current">{{ batchProgress.current }}</div>
+      <details v-if="batchProgress.errors.length"><summary>查看失败原因</summary>
+        <p v-for="(error, index) in batchProgress.errors" :key="index">{{ error }}</p>
+      </details>
+    </aside>
+              </template>
+            </PlaylistView>
           </main>
         </div>
         <PlayerFooter
@@ -774,7 +891,12 @@ onUnmounted(() => {
       @fetch-cover="handleFetchCover"
       @upload="handleUploadSong"
       @reselect-file="reselectUploadFile"
+      @batch="openBatchUpload"
     />
+
+    <BatchUploadDialog :open="isBatchDialogOpen" @cancel="isBatchDialogOpen = false"
+      @single="isBatchDialogOpen = false; isUploadDialogOpen = true" @upload="uploadBatch" />
+
 
     <input
       ref="uploadFileInputRef"
@@ -789,6 +911,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.batch-progress {
+
+  max-height: 45vh; overflow: auto; padding: .25rem;
+  background: var(--theme-panel, #fff); color: var(--theme-text, #334155);
+
+  font-size: .85rem; overflow-wrap: anywhere;
+  -webkit-app-region: no-drag;
+}
+.batch-progress progress { width: 100%; margin: .6rem 0; accent-color: #818cf8; }
 .app-shell {
   position: fixed;
   top: 0;

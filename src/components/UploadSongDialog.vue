@@ -21,6 +21,7 @@ const emit = defineEmits<{
   (event: "fetch-cover"): void;
   (event: "upload"): void;
   (event: "reselect-file"): void;
+  (event: "batch"): void;
 }>();
 
 const localDraft = reactive<UploadSongDraft>({
@@ -86,9 +87,8 @@ function handleReselectFile() {
           <header class="upload-header">
             <div class="upload-header-main">
               <p class="upload-eyebrow">本地音乐上传</p>
-              <h2 id="upload-song-title">上传歌曲</h2>
               <div class="upload-file-row">
-                <p class="upload-file-name">{{ localDraft.fileName }}</p>
+                <h2 id="upload-song-title">上传歌曲</h2>
                 <button
                   type="button"
                   class="file-reselect-button"
@@ -108,7 +108,9 @@ function handleReselectFile() {
                     />
                   </svg>
                 </button>
+                <button type="button" class="batch-mode-link" :disabled="props.isUploading" @click="emit('batch')">批量上传</button>
               </div>
+              <p class="upload-file-name">{{ localDraft.fileName }}</p>
               <p class="upload-file-name subtle">{{ localDraft.filePath }}</p>
             </div>
 
@@ -213,6 +215,7 @@ function handleReselectFile() {
 
 .upload-header-main {
   min-width: 0;
+  flex: 1;
 }
 
 .upload-eyebrow {
@@ -235,6 +238,23 @@ function handleReselectFile() {
   gap: 0.55rem;
   min-width: 0;
 }
+
+.batch-mode-link {
+  border: none;
+  padding: 0;
+  margin-left: auto;
+  background: transparent;
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.84rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.batch-mode-link:hover:not(:disabled) { text-decoration: underline; }
+.batch-mode-link:disabled { opacity: 0.5; cursor: default; }
+.batch-mode-link:focus-visible { outline: 2px solid #818cf8; outline-offset: 4px; }
+:global(:root[data-theme="dark"]) .batch-mode-link { color: #60a5fa; }
 
 .upload-file-name {
   margin: 0.45rem 0 0;
