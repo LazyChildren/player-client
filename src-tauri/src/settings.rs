@@ -73,59 +73,37 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Res
     fs::write(path, contents).map_err(|error| error.to_string())
 }
 
-/// Run the native Windows folder picker on a worker so the player stays responsive.
+/// Use the native system dialog, with the current download directory selected.
 #[tauri::command]
 pub(crate) async fn choose_download_directory(
+    app: tauri::AppHandle,
+    window: tauri::Window,
     initial_path: String,
 ) -> Result<Option<String>, String> {
-    #[cfg(target_os = "windows")]
-    {
-        tauri::async_runtime::spawn_blocking(move || {
-            use std::os::windows::process::CommandExt;
-            let script = r#"
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.Application]::EnableVisualStyles()
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = '选择音乐下载的文件夹'
-$dialog.ShowNewFolderButton = $true
-$dialog.SelectedPath = $env:SIMPLE_MUSIC_INITIAL_DIRECTORY
-$owner = New-Object System.Windows.Forms.Form
-$owner.TopMost = $true
-$owner.ShowInTaskbar = $false
-try {
-    if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) {
-        [Console]::Write($dialog.SelectedPath)
-    }
-} finally {
-    $dialog.Dispose()
-    $owner.Dispose()
-}
-"#;
-            // Pass paths as data, never interpolate them into executable PowerShell.
-            let output = std::process::Command::new("powershell.exe")
-                .args(["-NoProfile", "-STA", "-NonInteractive", "-Command", script])
-                .env("SIMPLE_MUSIC_INITIAL_DIRECTORY", initial_path)
-                .creation_flags(0x08000000)
-                .output()
-                .map_err(|e| format!("无法打开文件夹选择器：{}", e))?;
-            if !output.status.success() {
-                return Err("无法打开 Windows 文件夹选择器".to_string());
-            }
-            let path = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
-            if path.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(path))
-            }
-        })
-        .await
-        .map_err(|e| e.to_string())?
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = initial_path;
-        Err("当前平台请手动填写下载目录".into())
-    }
+    use tauri_plugin_dialog::DialogExt;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = app
+            .dialog()
+            .file()
+            .set_title("选择音乐下载的文件夹")
+            .set_parent(&window);
+        let initial = PathBuf::from(initial_path.trim());
+        if initial.is_absolute() && initial.is_dir() {
+            dialog = dialog.set_directory(initial);
+        } else if let Ok(downloads) = app.path().download_dir() {
+            dialog = dialog.set_directory(downloads);
+        }
+        dialog
+            .blocking_pick_folder()
+            .map(|folder| {
+                folder
+                    .into_path()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .map_err(|error| error.to_string())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
