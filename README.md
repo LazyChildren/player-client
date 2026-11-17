@@ -1,7 +1,191 @@
-# Tauri + Vue + TypeScript
+# Simple Music
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+基于 Tauri 2、Vue 3 和 TypeScript 的桌面音乐客户端，通过后端服务管理收藏夹和歌曲，支持在线播放、本地下载，以及单曲与批量操作。
 
-## Recommended IDE Setup
+## 功能
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- **收藏夹**：从服务端动态加载，默认打开第一个收藏夹，切换时加载对应歌曲。
+- **音乐播放**：播放 / 暂停、上一首 / 下一首、进度调整、音量和静音，支持列表循环、单曲循环和随机播放。
+- **搜索**：按歌曲名或艺术家筛选当前收藏夹中的歌曲。
+- **单曲上传**：选择 MP3 / OGG 文件，自动读取歌曲信息，支持编辑歌曲名、艺术家并获取封面链接。
+- **批量上传**：选择多个文件，逐行编辑歌曲信息，确认后在后台依次获取封面链接并上传，支持查看进度和失败原因。
+- **本地下载**：支持单曲与批量下载，优先播放已下载的本地文件。
+- **歌曲删除**：支持单曲与批量删除，删除前二次确认，同时清理对应本地文件和映射记录。
+- **外观与窗口**：浅色 / 深色主题、系统托盘，以及关闭窗口时隐藏到托盘或直接关闭应用的设置。
+
+## 技术栈
+
+| 部分 | 技术 |
+| --- | --- |
+| 界面 | Vue 3、TypeScript、Element Plus |
+| 前端构建 | Vite 6 |
+| 桌面运行时 | Tauri 2 |
+| 本地逻辑与网络请求 | Rust、reqwest、serde |
+
+后端 API 请求由 Rust 侧发起，前端通过 Tauri `invoke` 调用本地命令。本仓库包含客户端，运行时需要另行准备兼容的后端服务。
+
+## 本地开发
+
+### 环境准备
+
+- Node.js 与 npm，版本需满足项目依赖的运行要求。
+- Rust 工具链与 Cargo。
+- 对应操作系统的 Tauri 2 构建依赖；Windows 开发环境需要 MSVC C++ 构建工具、Windows SDK 和 WebView2 运行时。
+- 可访问的音乐后端服务。
+
+### 安装与启动
+
+在项目根目录执行：
+
+```sh
+npm install
+npm run tauri dev
+```
+
+Tauri 会自动启动 Vite 开发服务，默认地址为 `http://localhost:1420`。启动桌面应用后，在设置中填写后端地址与端口。
+
+仅调试前端界面时可以执行：
+
+```sh
+npm run dev
+```
+
+普通浏览器不提供 Tauri 本地命令，因此收藏夹加载、上传、下载、设置读写等功能需要在桌面应用中验证。
+
+### 构建与检查
+
+```sh
+# TypeScript 类型检查与前端生产构建
+npm run build
+
+# Rust 编译检查
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# 下载文件命名、映射与清理相关测试
+cargo test --manifest-path src-tauri/Cargo.toml --lib download_tests
+
+# 构建桌面应用和安装包
+npm run tauri build
+```
+
+前端构建输出位于 `dist/`。桌面安装包通常位于 `src-tauri/target/release/bundle/`，设置了 `CARGO_TARGET_DIR` 时以实际构建输出为准。
+
+## 使用说明
+
+### 服务与设置
+
+打开右上角设置入口，可以修改以下内容，修改后自动保存：
+
+| 设置项 | 默认值 / 行为 |
+| --- | --- |
+| 服务器 IP / 主机名 | `127.0.0.1`，支持填写带 `http://` 或 `https://` 的主机地址 |
+| 端口 | `3000`，单独填写，不要重复写入主机地址 |
+| 歌曲下载目录 | 留空使用系统下载目录下的 `Simple Music`；自定义目录需为绝对路径，也可点击“浏览”选择 |
+| 关闭窗口行为 | 默认隐藏到托盘，可选择直接关闭应用程序 |
+| 主题 | 浅色 / 深色，立即生效；也可使用标题栏主题切换入口 |
+
+默认后端地址为 `http://127.0.0.1:3000`。服务器地址、端口、下载目录和关闭行为保存在应用配置目录下的 `setting.json` 中；主题保存在 WebView 的本地存储中。
+
+### 上传歌曲
+
+1. 在左侧选择目标收藏夹，点击“上传歌曲”。
+2. 单曲模式通过上传图标选择 MP3 / OGG 文件，检查或编辑歌曲名和艺术家，获取封面链接后上传。
+3. 点击蓝色“批量上传”切换模式，选择多个文件后逐行编辑歌曲名和艺术家，再确认上传。
+4. 批量任务按顺序为每首歌获取封面链接并上传，上传目标固定为确认时选中的收藏夹。
+5. 上传期间可以继续浏览和播放；上传按钮暂时禁用，右侧显示动态进度图标。点击图标可展开或关闭进度浮层，查看“已处理 / 总数”和失败原因。
+
+批量任务中的单首歌曲失败后会继续处理后续歌曲。后台执行指应用仍在运行时可以继续进行其他操作；退出应用后任务不会继续，也不会在下次启动时自动恢复。
+
+### 多选、下载与删除
+
+点击列表上方的“多选”后，可逐首勾选或使用表头全选：
+
+- **取消多选**：退出多选模式。
+- **下载**：依次下载所选歌曲，显示处理数量，完成后汇总成功与失败结果。
+- **删除**：确认所选歌曲数量后依次删除，同时清理各自的本地文件与映射；单首删除失败不会中断后续处理。
+
+全选作用于当前显示列表中的可操作歌曲，搜索后的全选也仅包含筛选结果。正在下载或删除的歌曲不可勾选。已下载歌曲再次下载时，会复用对应的本地文件。
+
+### 下载文件与歌曲身份
+
+下载文件使用便于阅读的名称，保留音频扩展名；出现重名时追加序号，例如：
+
+```text
+Simple Music/
+├── 歌曲-艺术家.mp3
+├── 歌曲-艺术家-2.mp3
+└── .simple-music-downloads.json
+```
+
+程序使用“后端服务器地址 + 歌曲 ID”识别歌曲，并将身份与实际文件名的对应关系写入下载目录中的 `.simple-music-downloads.json`。即使歌曲名和艺术家完全一致，也能分别找到各自的文件。
+
+请将映射文件与音乐文件一起保留。手动重命名或移动音乐文件、删除映射文件、切换下载目录，都可能导致程序无法识别原有下载。没有映射的同名文件会被保留，新下载会使用序号避让。旧版“服务器标识 + 歌曲 ID”格式的下载文件仍支持识别。
+
+单曲和批量删除均会调用服务端删除接口，服务端成功后再清理当前下载目录中对应的本地文件与映射。如果本地清理失败，会单独提示。当前文件存在性检查只验证文件存在且大小大于零，不包含音频内容或完整性校验。
+
+## 后端接口约定
+
+下列路径均相对于设置中的后端地址。业务成功码为字符串 `"200"`，失败信息通过 `msg` 返回。
+
+| 功能 | 方法 | 路径 | 参数 |
+| --- | --- | --- | --- |
+| 收藏夹列表 | GET | `/collection/queryAll` | 无 |
+| 收藏夹歌曲 | GET | `/music/queryByCollection` | 查询参数 `collectionId` |
+| 获取封面链接 | GET | `/music/getCoverUrl` | 查询参数 `musicName`、`artist` |
+| 上传歌曲 | POST | `/music/upload` | multipart 表单：`file`、`collectionId`、`musicName`、`artist`、`coverUrl` |
+| 删除歌曲 | GET | `/music/delete` | 查询参数 `id` |
+
+音频下载直接请求歌曲记录中的 `urlLink`。批量上传、下载和删除均复用单曲接口，按顺序逐首处理，无需额外批量接口。
+
+收藏夹列表响应示例：
+
+```json
+{
+  "code": "200",
+  "msg": "success",
+  "data": [
+    {
+      "id": 1,
+      "collectionName": "默认收藏夹",
+      "createdTime": "2026-11-17 10:33:57.0",
+      "modifiedTime": "2026-11-17 10:33:57.0",
+      "valid": 1
+    }
+  ]
+}
+```
+
+歌曲列表的 `data` 为数组，每项包含 `id`、`musicName`、`artist`、`coverUrl`、`urlLink`。获取封面接口的 `data` 为 URL 字符串；上传、删除接口至少需要返回 `code` 和 `msg`。
+
+## 目录结构
+
+```text
+src/
+├── App.vue                       # 收藏夹、播放状态与上传 / 下载 / 删除流程
+├── components/
+│   ├── SidebarMenu.vue           # 收藏夹导航
+│   ├── PlaylistView.vue          # 歌曲列表、多选与上传进度入口
+│   ├── PlayerFooter.vue          # 播放控制栏
+│   ├── UploadSongDialog.vue      # 单曲上传
+│   ├── BatchUploadDialog.vue     # 批量上传与歌曲信息编辑
+│   └── WindowControls.vue        # 窗口控制与设置入口
+├── views/SettingsView.vue        # 设置页面
+├── utils/audioMetadata.ts        # MP3 / OGG 歌曲信息解析
+├── utils/theme.ts                # 主题应用与持久化
+└── types/music.ts                # 前端数据类型
+src-tauri/
+├── src/music.rs                  # 后端 API、文件下载、映射与清理
+├── src/settings.rs               # 配置读写与目录选择
+├── src/tray.rs                   # 系统托盘
+├── src/window.rs                 # 窗口关闭行为
+├── src/app.rs                    # Tauri 命令注册与应用初始化
+└── tauri.conf.json               # 桌面应用与打包配置
+```
+
+## 常见问题
+
+- **收藏夹或歌曲加载失败**：检查后端是否启动、主机和端口是否填写正确，以及接口是否返回约定的数据结构。
+- **上传时没有可选收藏夹**：先确认收藏夹接口返回有效列表，上传需要目标收藏夹的 `collectionId`。
+- **下载后未被识别**：检查当前下载目录、文件和映射是否仍在原位置；无映射的同名文件不会自动归属到某首歌曲。
+- **关闭窗口后应用仍在运行**：默认行为是隐藏到托盘；可以从托盘菜单退出，或在设置中更改关闭行为。
+- **开发端口被占用**：Vite 固定使用 `1420` 端口，占用时会报错，需要先释放端口。
