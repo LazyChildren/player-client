@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import type { Track } from "../types/music";
 
 type TrackRow = {
@@ -15,15 +16,43 @@ const props = defineProps<{
   loading: boolean;
   errorMessage: string;
   deletingTrackIds: number[];
+  downloadingTrackIds: number[];
+  batchUploading: boolean;
+  hasUploadProgress: boolean;
+  uploadProgressOpen: boolean;
+  deleting: boolean;
+  batchDownloading: boolean;
+  downloadProgress: string;
+  collectionId: number | null;
 }>();
 
 const emit = defineEmits<{
   (event: "select", index: number): void;
   (event: "play", index: number): void;
   (event: "delete", index: number): void;
+  (event: "download", index: number): void;
   (event: "refresh"): void;
   (event: "upload"): void;
+  (event: "toggle-upload-progress"): void;
+  (event: "batch-delete", ids: number[]): void;
+  (event: "batch-download", ids: number[]): void;
 }>();
+
+const batchMode = ref(false);
+const selectedIds = ref<number[]>([]);
+const selectableIds = computed(() => props.tracks.filter(({ track }) =>
+  !props.downloadingTrackIds.includes(track.id) && !props.deletingTrackIds.includes(track.id)
+).map(({ track }) => track.id));
+const allSelected = computed(() => selectableIds.value.length > 0 && selectableIds.value.every(id => selectedIds.value.includes(id)));
+watch(() => props.collectionId, () => { batchMode.value = false; selectedIds.value = []; });
+watch(selectableIds, ids => { selectedIds.value = selectedIds.value.filter(id => ids.includes(id)); });
+function toggleBatchMode() {
+  batchMode.value = !batchMode.value;
+  selectedIds.value = [];
+}
+function toggleAll() {
+  selectedIds.value = allSelected.value ? [] : [...selectableIds.value];
+}
 
 function selectTrack(index: number) {
   emit("select", index);
@@ -43,6 +72,7 @@ function refreshPlaylist() {
 }
 
 function openUploadDialog() {
+  if (props.batchUploading) return;
   emit("upload");
 }
 </script>
@@ -75,11 +105,16 @@ function openUploadDialog() {
             />
           </svg>
         </button>
+        <span class="playlist-count">{{ props.tracks.length }} 首</span>
       </div>
 
       <div class="playlist-header-actions">
-        <span class="playlist-count">{{ props.tracks.length }} 首</span>
-        <button type="button" class="playlist-upload-button" aria-label="上传歌曲" title="上传歌曲" @click="openUploadDialog">
+        <button type="button" class="batch-delete-link" :disabled="props.deleting || props.batchDownloading || props.loading" @click="toggleBatchMode">{{ batchMode ? '取消多选' : '多选' }}</button>
+        <template v-if="batchMode">
+          <button type="button" class="batch-delete-link danger" :disabled="props.deleting || props.batchDownloading || !selectedIds.length" @click="emit('batch-delete', [...selectedIds])">{{ props.deleting ? '删除中…' : '删除' }}</button>
+          <button type="button" class="batch-delete-link" :disabled="props.deleting || props.batchDownloading || !selectedIds.length" @click="emit('batch-download', [...selectedIds])">{{ props.batchDownloading ? `下载中 ${props.downloadProgress}` : '下载' }}</button>
+        </template>
+        <button type="button" class="playlist-upload-button" :disabled="props.batchUploading" aria-label="上传歌曲" title="上传歌曲" @click="openUploadDialog">
           <svg
             class="playlist-upload-icon"
             viewBox="0 0 1024 1024"
@@ -98,16 +133,34 @@ function openUploadDialog() {
           </svg>
           <span>上传歌曲</span>
         </button>
+        <el-popover v-if="props.hasUploadProgress" :visible="props.uploadProgressOpen"
+          placement="bottom-end" :width="320" :show-arrow="true" :teleported="true">
+          <template #reference>
+        <button type="button" class="upload-progress-button"
+          :aria-expanded="props.uploadProgressOpen" aria-controls="batch-upload-progress"
+          aria-label="查看上传进度" title="查看上传进度" @click="emit('toggle-upload-progress')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle v-if="props.batchUploading" class="upload-progress-ring" cx="12" cy="12" r="10" stroke-dasharray="45 18" />
+            <circle v-else cx="12" cy="12" r="10" opacity="0.4" />
+            <path d="M12 17V7m-4 4 4-4 4 4" />
+          </svg>
+        </button>
+          </template>
+          <slot name="upload-progress" />
+        </el-popover>
       </div>
     </div>
 
-    <div class="track-table-header">
-      <span class="col-index">序号</span>
-      <span class="col-title">标题</span>
-      <span class="col-artist">艺术家</span>
-      <span>操作</span>
-    </div>
     <div class="playlist-body">
+      <div class="track-table-header">
+        <span class="col-index">
+          <input v-if="batchMode" type="checkbox" aria-label="全选当前列表可操作的歌曲" :checked="allSelected" :indeterminate="selectedIds.length > 0 && !allSelected" :disabled="props.deleting || props.batchDownloading || !selectableIds.length" @change="toggleAll" />
+          <template v-else>序号</template>
+        </span>
+        <span class="col-title">标题</span>
+        <span class="col-artist">艺术家</span>
+        <span class="col-actions">操作</span>
+      </div>
       <div v-if="props.loading" class="playlist-state">正在加载音乐列表...</div>
       <div v-else-if="props.errorMessage" class="playlist-state error">{{ props.errorMessage }}</div>
       <div v-else-if="!props.tracks.length" class="playlist-state">暂无可播放的音乐数据</div>
@@ -121,7 +174,8 @@ function openUploadDialog() {
           @dblclick="playTrack(item.originalIndex)"
         >
           <span class="row-index">
-            <span v-if="props.isPlaying && item.originalIndex === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
+            <input v-if="batchMode" v-model="selectedIds" type="checkbox" :value="item.track.id" :aria-label="`选择歌曲 ${item.track.title}`" :disabled="props.deleting || props.batchDownloading || !selectableIds.includes(item.track.id)" @click.stop @dblclick.stop />
+            <span v-else-if="props.isPlaying && item.originalIndex === props.currentTrackIndex" class="playing-bars" aria-hidden="true">
               <svg
                 t="1779702244479"
                 class="icon playing-bars-icon"
@@ -140,13 +194,30 @@ function openUploadDialog() {
             <template v-else>{{ index + 1 }}</template>
           </span>
           <div class="track-item">
-            <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
+            <span class="cover-container">
+              <img class="cover-preview" :src="item.track.coverUrl" :alt="item.track.title" />
+              <svg v-if="item.track.localPath" class="downloaded-badge" viewBox="0 0 1024 1024" role="img" aria-label="已下载" xmlns="http://www.w3.org/2000/svg">
+                <path d="M459.755102 637.387755c-5.22449 0-10.44898-2.089796-14.628571-6.269388l-104.489796-104.489796c-8.359184-8.359184-8.359184-21.420408 0-29.779591 8.359184-8.359184 21.420408-8.359184 29.779592 0l104.489795 104.489796c8.359184 8.359184 8.359184 21.420408 0 29.779591-4.702041 4.179592-9.926531 6.269388-15.15102 6.269388z" fill="#cdcdcd" />
+                <path d="M459.755102 637.387755c-5.22449 0-10.44898-2.089796-14.628571-6.269388-8.359184-8.359184-8.359184-21.420408 0-29.779591l208.979591-208.979592c8.359184-8.359184 21.420408-8.359184 29.779592 0 8.359184 8.359184 8.359184 21.420408 0 29.779592l-208.979592 208.979591c-4.702041 4.179592-9.926531 6.269388-15.15102 6.269388z" fill="#cdcdcd" />
+                <path d="M512 929.959184c-230.4 0-417.959184-187.559184-417.959184-417.959184s187.559184-417.959184 417.959184-417.959184 417.959184 187.559184 417.959184 417.959184-187.559184 417.959184-417.959184 417.959184z m0-794.122449c-207.412245 0-376.163265 168.75102-376.163265 376.163265s168.75102 376.163265 376.163265 376.163265 376.163265-168.75102 376.163265-376.163265-168.75102-376.163265-376.163265-376.163265z" fill="#cdcdcd" />
+              </svg>
+            </span>
             <div class="track-meta">
               <p class="track-title">{{ item.track.title }}</p>
             </div>
           </div>
           <span class="row-artist">{{ item.track.artist }}</span>
           <span class="duration">
+            <button type="button" class="track-action-button download-button" :disabled="props.downloadingTrackIds.includes(item.track.id) || !!item.track.localPath" :aria-busy="props.downloadingTrackIds.includes(item.track.id)" :title="item.track.localPath ? '已下载' : props.downloadingTrackIds.includes(item.track.id) ? '正在下载' : '下载歌曲'" aria-label="下载歌曲" @click.stop="emit('download', item.originalIndex)" @dblclick.stop>
+              <span v-if="props.downloadingTrackIds.includes(item.track.id)" class="delete-spinner" aria-hidden="true"></span>
+              <svg v-else-if="item.track.localPath" class="download-complete-icon" viewBox="0 0 1024 1024" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M512 244.345V665 M325.191 495.515L514.124 665L703.058 495.515 M197.113 779.655H826.889" fill="none" stroke="#bfbfbf" stroke-width="42" stroke-linejoin="round" />
+                <path d="M842.633 338.812c-86.956 0-157.443-70.487-157.443-157.443s70.487-157.443 157.443-157.443 157.443 70.487 157.443 157.443-70.487 157.443-157.443 157.443zM780.41 164.615l-13.319 14.485 59.813 54.916 87.916-84.941-13.682-14.138-74.581 72.046-46.147-42.353z" fill="#bfbfbf" />
+              </svg>
+              <svg v-else viewBox="0 0 1024 1024" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M544.256 605.184l244.224-244.224a31.744 31.744 0 0 1 45.056 45.056l-295.424 295.424a36.864 36.864 0 0 1-51.2 0L190.464 406.528a31.744 31.744 0 1 1 45.056-45.056l244.224 244.224V111.104a32.256 32.256 0 1 1 64 0zM153.6 902.656a32.256 32.256 0 0 1 0-64h716.8a32.256 32.256 0 0 1 0 64z" fill="currentColor" />
+              </svg>
+            </button>
             <button
               type="button"
               class="track-action-button delete-button"
@@ -181,7 +252,65 @@ function openUploadDialog() {
 </template>
 
 <style scoped>
+.batch-delete-link { padding: .25rem 0; border: none; background: transparent; color: var(--theme-accent, #2563eb); font: inherit; font-size: .84rem; cursor: pointer; white-space: nowrap; }
+.batch-delete-link:hover:not(:disabled) { text-decoration: underline; }
+.batch-delete-link.danger { color: #ef4444; }
+.batch-delete-link:disabled { opacity: .45; cursor: default; }
+.batch-delete-link:focus-visible { outline: 2px solid #818cf8; outline-offset: 3px; }
+input[type="checkbox"] {
+  --checkbox-color: #334155;
+  --checkbox-mark: #fff;
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--checkbox-color);
+  border-radius: .2rem;
+  background: transparent;
+  vertical-align: middle;
+  cursor: pointer;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate { background: var(--checkbox-color); }
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: .25rem;
+  height: .45rem;
+  border: solid var(--checkbox-mark);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+input[type="checkbox"]:indeterminate::before {
+  content: "";
+  width: .5rem;
+  height: 2px;
+  background: var(--checkbox-mark);
+  border: none;
+  transform: none;
+}
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--checkbox-color); outline-offset: 3px; }
+input[type="checkbox"]:disabled { opacity: .4; cursor: not-allowed; }
+:global(:root[data-theme="dark"]) input[type="checkbox"] {
+  --checkbox-color: #e2e8f0;
+  --checkbox-mark: #1b202b;
+}
+.playlist-upload-button:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.upload-progress-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; padding: .25rem; border: none; border-radius: .5rem;
+  background: transparent; color: var(--theme-accent, #4f46e5); cursor: pointer;
+}
+.upload-progress-button:hover { background: var(--theme-tint, rgba(79, 70, 229, .08)); }
+.upload-progress-button:focus-visible { outline: 2px solid #818cf8; outline-offset: 3px; }
+.upload-progress-button svg { width: 1.4rem; height: 1.4rem; overflow: visible; }
+.upload-progress-ring { transform-origin: 12px 12px; animation: upload-progress-spin 1.2s linear infinite; }
+@keyframes upload-progress-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .upload-progress-ring { animation: none; } }
 .playlist-panel {
+  --track-columns: 48px minmax(0, 1.1fr) minmax(0, 1fr) 120px;
   background: rgba(255, 255, 255, 0.88);
   border-radius: 0;
   padding: 0.7rem;
@@ -335,8 +464,13 @@ function openUploadDialog() {
 }
 
 .track-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  margin-bottom: 0.6rem;
   display: grid;
-  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
+  grid-template-columns: var(--track-columns);
   align-items: center;
   gap: 0.75rem;
   padding: 0 0.9rem 0.35rem;
@@ -347,10 +481,7 @@ function openUploadDialog() {
 }
 
 .col-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  justify-self: center;
+  padding-left: 0.375rem;
 }
 
 .col-index {
@@ -385,7 +516,7 @@ function openUploadDialog() {
 
 .track-list li {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) 90px;
+  grid-template-columns: var(--track-columns);
   align-items: center;
   gap: 0.75rem;
   padding: 0.3rem 0;
@@ -465,6 +596,8 @@ function openUploadDialog() {
   font-size: 0.92rem;
 }
 
+.cover-container { position: relative; width: 3rem; height: 3rem; flex-shrink: 0; }
+.downloaded-badge { position: absolute; right: -3px; bottom: -3px; width: 17px; height: 17px; background: #374151; border-radius: 50%; }
 .cover-preview {
   width: 3rem;
   height: 3rem;
@@ -505,7 +638,20 @@ function openUploadDialog() {
   cursor: pointer;
   color: #6b7280;
   transition: transform 0.15s ease;
-  padding: 0.8rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex: 0 0 28px;
+}
+
+.track-action-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.track-action-button .download-complete-icon {
+  width: 23px;
+  height: 23px;
 }
 
 .track-action-button:hover {
@@ -515,9 +661,14 @@ function openUploadDialog() {
   cursor: not-allowed;
 }
 
+.download-button:disabled {
+  color: #cbd5e1;
+  transform: none;
+}
+
 .delete-spinner {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
@@ -545,6 +696,9 @@ function openUploadDialog() {
 }
 
 .duration {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   color: #8a8a8a;
   font-size: 0.86rem;
   font-weight: 400;

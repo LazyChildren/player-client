@@ -1,9 +1,18 @@
 export type AppSettings = {
   serverIp: string;
   serverPort: string;
+  downloadDirectory?: string;
   volume?: number;
   playbackOrder?: 'loop' | 'one' | 'shuffle';
   closeWindowBehavior?: 'minimize' | 'exit';
+};
+
+export type Collection = {
+  id: number;
+  collectionName: string;
+  createdTime: string;
+  modifiedTime: string;
+  valid: number;
 };
 
 export type Track = {
@@ -12,5 +21,6 @@ export type Track = {
   artist: string;
   coverUrl: string;
   src: string;
+  localPath?: string | null;
   duration?: string;
 };

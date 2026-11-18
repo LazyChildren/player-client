@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
-import { ElMessage } from "element-plus";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import PlayerFooter from "./components/PlayerFooter.vue";
 import PlaylistView from "./components/PlaylistView.vue";
-import SettingsDialog from "./components/SettingsDialog.vue";
+import SettingsView from "./views/SettingsView.vue";
 import SidebarMenu from "./components/SidebarMenu.vue";
 import UploadSongDialog, { type UploadSongDraft } from "./components/UploadSongDialog.vue";
 import WindowControls from "./components/WindowControls.vue";
+import BatchUploadDialog, { type BatchUploadItem } from "./components/BatchUploadDialog.vue";
 import { parseAudioMetadata } from "./utils/audioMetadata.ts";
-import type { AppSettings, Track } from "./types/music";
+import { useTheme } from "./utils/theme";
+import type { AppSettings, Collection, Track } from "./types/music";
 
 const DEFAULT_SETTINGS: AppSettings = {
   serverIp: "127.0.0.1",
@@ -22,7 +25,11 @@ const DEFAULT_SETTINGS: AppSettings = {
 const tracks = ref<Track[]>([]);
 const currentTrackIndex = ref(0);
 const activeTrackIndex = ref(0);
-const currentPlaylistName = ref("默认歌单");
+const collections = ref<Collection[]>([]);
+const selectedCollectionId = ref<number | null>(null);
+const currentPlaylistName = computed(() => collections.value.find(
+  (collection) => collection.id === selectedCollectionId.value,
+)?.collectionName ?? "收藏夹");
 const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -34,15 +41,64 @@ const playbackOrder = ref<'loop' | 'one' | 'shuffle'>('loop');
 // shuffle queue state: permutation of indices when in shuffle mode
 const shuffleQueue = ref<number[]>([]);
 const shufflePos = ref(0);
-const isSettingsOpen = ref(false);
+const currentPage = ref(window.location.hash === "#/settings" ? "settings" : "playlist");
+const isSavingSettings = ref(false);
+function syncPage() {
+  currentPage.value = window.location.hash === "#/settings" ? "settings" : "playlist";
+  if (currentPage.value === "playlist") {
+    void flushSettings().then(() => {
+      if (playlistNeedsRefresh) {
+        playlistNeedsRefresh = false;
+        void fetchCollections();
+      }
+    });
+  }
+}
 const savedSettings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isLoadingTracks = ref(false);
 const trackLoadError = ref("");
 const deletingTrackIds = ref<number[]>([]);
+const downloadingTrackIds = ref<number[]>([]);
 const uploadFileInputRef = ref<HTMLInputElement | null>(null);
 const isUploadDialogOpen = ref(false);
 const selectedUploadFile = ref<File | null>(null);
 const isUploadingSong = ref(false);
+const isBatchDialogOpen = ref(false);
+const batchProgress = ref({ running: false, completed: 0, total: 0, failed: 0, current: "", errors: [] as string[] });
+const isUploadProgressOpen = ref(false);
+
+function openBatchUpload() {
+  if (isUploadingSong.value || batchProgress.value.running) return;
+  closeUploadDialog();
+  isBatchDialogOpen.value = true;
+}
+
+async function uploadBatch(items: BatchUploadItem[]) {
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null || batchProgress.value.running || !items.length) return;
+  isBatchDialogOpen.value = false;
+  isUploadProgressOpen.value = false;
+  batchProgress.value = { running: true, completed: 0, total: items.length, failed: 0, current: "", errors: [] };
+  for (const item of items) {
+    batchProgress.value.current = item.title;
+    try {
+      const coverUrl = await invoke<string>("fetch_cover_url", { musicName: item.title, artist: item.artist });
+      const fileBytes = Array.from(new Uint8Array(await item.file.arrayBuffer()));
+      await invoke("upload_music", { collectionId, fileName: item.file.name, fileBytes,
+        musicName: item.title, artist: item.artist, coverUrl });
+    } catch (error) {
+      batchProgress.value.failed++;
+      batchProgress.value.errors.push(`${item.title}：${String(error)}`);
+    } finally {
+      batchProgress.value.completed++;
+    }
+  }
+  batchProgress.value.running = false;
+  batchProgress.value.current = "";
+  ElMessage({ type: batchProgress.value.failed ? "warning" : "success",
+    message: `批量上传完成：成功 ${items.length - batchProgress.value.failed} 首，失败 ${batchProgress.value.failed} 首` });
+  if (selectedCollectionId.value === collectionId) await fetchTracks();
+}
 const uploadSongDraft = ref<UploadSongDraft>({
   fileName: "",
   filePath: "",
@@ -67,11 +123,12 @@ const filteredTracks = computed(() => {
 });
 
 function openSettings() {
-  isSettingsOpen.value = true;
+  window.location.hash = "/settings";
 }
 
 function closeSettings() {
-  isSettingsOpen.value = false;
+  void flushSettings();
+  window.location.hash = "/";
 }
 
 function resetUploadSongDraft() {
@@ -85,52 +142,73 @@ function resetUploadSongDraft() {
   selectedUploadFile.value = null;
 }
 
-async function saveSettings(settings: AppSettings) {
-  savedSettings.value = {
-    serverIp: settings.serverIp,
-    serverPort: settings.serverPort,
-    volume: volume.value,
-    playbackOrder: playbackOrder.value,
-    closeWindowBehavior: settings.closeWindowBehavior || "minimize",
-  };
+let settingsTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingSettings: AppSettings | null = null;
+let settingsSaveChain: Promise<void> = Promise.resolve();
+let playlistNeedsRefresh = false;
 
-  try {
-    await invoke("save_settings", {
-      settings: {
-        server_ip: savedSettings.value.serverIp,
-        server_port: savedSettings.value.serverPort,
-        volume: savedSettings.value.volume,
-        playback_order: savedSettings.value.playbackOrder,
-        close_window_behavior: savedSettings.value.closeWindowBehavior,
-      },
-    });
-    await fetchTracks();
-  } catch (error) {
-    console.error("Failed to save settings", error);
-  }
-
-  closeSettings();
+function saveSettings(settings: AppSettings) {
+  pendingSettings = { ...settings };
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => { void flushSettings(); }, 400);
 }
 
-function applyTrack(track: Track | undefined) {
+function flushSettings(): Promise<void> {
+  clearTimeout(settingsTimer);
+  settingsTimer = undefined;
+  const pending = pendingSettings;
+  pendingSettings = null;
+  if (!pending) return settingsSaveChain;
+  // Serialize writes so an older request can never overwrite the latest edit.
+  settingsSaveChain = settingsSaveChain.then(async () => {
+    isSavingSettings.value = true;
+    const nextSettings: AppSettings = {
+      ...pending,
+      volume: volume.value,
+      playbackOrder: playbackOrder.value,
+      closeWindowBehavior: pending.closeWindowBehavior || "minimize",
+    };
+    try {
+      await invoke("save_settings", { settings: nextSettings });
+      playlistNeedsRefresh ||= nextSettings.serverIp !== savedSettings.value.serverIp
+        || nextSettings.serverPort !== savedSettings.value.serverPort
+        || nextSettings.downloadDirectory !== savedSettings.value.downloadDirectory;
+      savedSettings.value = nextSettings;
+    } catch (error) {
+      ElMessage.error(typeof error === "string" ? error : "自动保存失败，请重新修改后重试");
+    } finally {
+      isSavingSettings.value = false;
+    }
+  });
+  return settingsSaveChain;
+}
+
+let playbackRequest = 0;
+async function applyTrack(track: Track | undefined) {
   if (!audioRef.value || !track) return;
 
-  audioRef.value.src = track.src;
+  const request = ++playbackRequest;
+  track.localPath = await invoke<string | null>("resolve_local_music", { id: track.id, src: track.src, title: track.title, artist: track.artist }).catch(() => null);
+  if (request !== playbackRequest || !audioRef.value) return;
+  const source = track.localPath ? convertFileSrc(track.localPath) : track.src;
+  if (audioRef.value.getAttribute("src") === source) return;
+  audioRef.value.src = source;
   audioRef.value.load();
   currentTime.value = 0;
   duration.value = 0;
 }
 
 function loadTrack() {
-  applyTrack(currentTrack.value);
+  return applyTrack(currentTrack.value);
 }
 
-function playPause() {
+async function playPause() {
   if (!audioRef.value || !tracks.value.length) return;
 
   if (isPlaying.value) {
     audioRef.value.pause();
   } else {
+    await applyTrack(currentTrack.value);
     void audioRef.value.play();
   }
 }
@@ -170,6 +248,9 @@ function selectTrack(index: number) {
 }
 
 function playTrack(index: number) {
+  if (index === currentTrackIndex.value) {
+    void applyTrack(currentTrack.value).then(() => audioRef.value?.play());
+  }
   activeTrackIndex.value = index;
   currentTrackIndex.value = index;
   isPlaying.value = true;
@@ -180,58 +261,127 @@ function playTrack(index: number) {
   }
 }
 
-async function deleteTrack(index: number) {
-  if (index < 0 || index >= tracks.value.length) return;
-
+async function downloadTrack(index: number) {
   const track = tracks.value[index];
-  const isCurrentTrackDeleted = index === currentTrackIndex.value;
-  const wasCurrentPlaying = isCurrentTrackDeleted && isPlaying.value;
-  const deletingId = track.id;
-
-  if (deletingTrackIds.value.includes(deletingId)) return;
-  deletingTrackIds.value.push(deletingId);
-
+  if (!track || downloadingTrackIds.value.includes(track.id)) return;
+  if (deleteConfirmationOpen || deletingTrackIds.value.includes(track.id)) return;
+  downloadingTrackIds.value.push(track.id);
   try {
-    if (wasCurrentPlaying && audioRef.value) {
-      audioRef.value.pause();
-    }
-
-    await invoke("delete_music", { id: track.id });
-
-    if (isCurrentTrackDeleted) {
-      isPlaying.value = false;
-    }
-
-    await fetchTracks();
-
-    ElMessage({
-      message: "歌曲已删除",
-      type: "success",
-      duration: 2200,
-      showClose: true,
-      grouping: false,
-      offset: 24,
-      zIndex: 20050,
-    });
+    const localPath = await invoke<string>("download_music", { id: track.id, src: track.src, title: track.title, artist: track.artist });
+    const latest = tracks.value.find(item => item.id === track.id && item.src === track.src);
+    if (latest) latest.localPath = localPath;
+    ElMessage.success("歌曲已下载");
   } catch (error) {
-    if (wasCurrentPlaying && audioRef.value) {
-      audioRef.value.play().catch(() => {});
-    }
-    console.error("Failed to delete music", error);
-    ElMessage({
-      message: error instanceof Error && error.message ? error.message : "删除失败",
-      type: "error",
-      duration: 3000,
-      showClose: true,
-      grouping: false,
-      offset: 24,
-      zIndex: 20050,
-    });
+    ElMessage.error(typeof error === "string" ? error : "下载失败，请稍后重试");
   } finally {
-    deletingTrackIds.value = deletingTrackIds.value.filter((id) => id !== deletingId);
+    downloadingTrackIds.value = downloadingTrackIds.value.filter(id => id !== track.id);
   }
 }
 
+const isBatchDownloading = ref(false);
+const batchDownloadProgress = ref({ completed: 0, total: 0 });
+async function downloadTracks(ids: number[]) {
+  if (isBatchDownloading.value || deleteConfirmationOpen || isDeletingTracks.value) return;
+  const selected = tracks.value.filter(track => ids.includes(track.id)
+    && !downloadingTrackIds.value.includes(track.id) && !deletingTrackIds.value.includes(track.id));
+  if (!selected.length) return;
+  isBatchDownloading.value = true;
+  batchDownloadProgress.value = { completed: 0, total: selected.length };
+  downloadingTrackIds.value.push(...selected.map(track => track.id));
+  let succeeded = 0;
+  const errors: string[] = [];
+  try {
+    for (const track of selected) {
+      try {
+        const localPath = await invoke<string>("download_music", {
+          id: track.id, src: track.src, title: track.title, artist: track.artist,
+        });
+        const latest = tracks.value.find(item => item.id === track.id && item.src === track.src);
+        if (latest) latest.localPath = localPath;
+        succeeded++;
+      } catch (error) {
+        errors.push(`${track.title}：${String(error)}`);
+      } finally {
+        batchDownloadProgress.value.completed++;
+      }
+    }
+    ElMessage({ message: [`批量下载完成：成功 ${succeeded} 首，失败 ${errors.length} 首`, ...errors].join("；"),
+      type: errors.length ? "warning" : "success", duration: errors.length ? 6000 : 2500, showClose: true });
+  } finally {
+    const selectedIds = new Set(selected.map(track => track.id));
+    downloadingTrackIds.value = downloadingTrackIds.value.filter(id => !selectedIds.has(id));
+    isBatchDownloading.value = false;
+  }
+}
+
+let deleteConfirmationOpen = false;
+const isDeletingTracks = ref(false);
+async function deleteTrack(index: number) {
+  const track = tracks.value[index];
+  if (track) await deleteTracks([track.id]);
+}
+
+async function deleteTracks(ids: number[]) {
+  if (deleteConfirmationOpen || isDeletingTracks.value) return;
+  const selected = tracks.value.filter(track => ids.includes(track.id));
+  if (!selected.length) return;
+  if (selected.some(track => downloadingTrackIds.value.includes(track.id))) {
+    ElMessage.warning("所选歌曲正在下载，请下载完成后再删除");
+    return;
+  }
+  if (selected.some(track => deletingTrackIds.value.includes(track.id))) return;
+  deleteConfirmationOpen = true;
+  try {
+    const description = selected.length === 1 ? `歌曲「${selected[0].title}」` : `所选的 ${selected.length} 首歌曲`;
+    await ElMessageBox.confirm(`确定删除${description}吗？已下载的本地文件也会一并删除。`, "删除歌曲", {
+      confirmButtonText: "确认删除", cancelButtonText: "取消", type: "warning", closeOnClickModal: false,
+    });
+  } catch {
+    return;
+  } finally {
+    deleteConfirmationOpen = false;
+  }
+  isDeletingTracks.value = true;
+  deletingTrackIds.value.push(...selected.map(track => track.id));
+  let succeeded = 0;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  try {
+    for (const track of selected) {
+      const isCurrent = currentTrack.value?.id === track.id;
+      const wasPlaying = isCurrent && isPlaying.value;
+      if (isCurrent && audioRef.value) {
+        ++playbackRequest;
+        audioRef.value.pause();
+        audioRef.value.removeAttribute("src");
+        audioRef.value.load();
+      }
+      try {
+        const warning = await invoke<string | null>("delete_music", { id: track.id, src: track.src });
+        succeeded++;
+        if (warning) warnings.push(`${track.title}：${warning}`);
+        if (isCurrent) isPlaying.value = false;
+      } catch (error) {
+        errors.push(`${track.title}：${String(error)}`);
+        if (wasPlaying && currentTrack.value?.id === track.id) {
+          await applyTrack(track);
+          void audioRef.value?.play().catch(() => {});
+        }
+      }
+    }
+    await fetchTracks();
+    const result = selected.length === 1
+      ? (succeeded ? "歌曲已删除" : "删除失败")
+      : `批量删除完成：成功 ${succeeded} 首，失败 ${errors.length} 首`;
+    ElMessage({ message: [result, ...errors, ...warnings].join("；"),
+      type: errors.length || warnings.length ? "warning" : "success",
+      duration: errors.length || warnings.length ? 6000 : 2500, showClose: true });
+  } finally {
+    const selectedIds = new Set(selected.map(track => track.id));
+    deletingTrackIds.value = deletingTrackIds.value.filter(id => !selectedIds.has(id));
+    isDeletingTracks.value = false;
+  }
+}
 function setPlaybackOrder(order: 'loop' | 'one' | 'shuffle') {
   playbackOrder.value = order;
   if (order === 'shuffle') {
@@ -289,7 +439,15 @@ function toggleMute() {
 }
 
 function openUploadPicker() {
-  uploadFileInputRef.value?.click();
+  if (batchProgress.value.running) {
+    showUploadAlert("批量上传正在后台执行，请等待当前任务完成");
+    return;
+  }
+  if (selectedCollectionId.value === null) {
+    showUploadAlert("请先选择收藏夹");
+    return;
+  }
+  isUploadDialogOpen.value = true;
 }
 
 function reselectUploadFile() {
@@ -325,7 +483,7 @@ function showUploadAlert(message: string) {
 }
 
 function parseUploadFileName(fileName: string) {
-  const baseName = fileName.replace(/\.mp3$/i, "").trim();
+  const baseName = fileName.replace(/\.(mp3|ogg)$/i, "").trim();
   const parts = baseName.split("-");
 
   if (parts.length < 2) {
@@ -398,6 +556,11 @@ async function handleFetchCover() {
 }
 
 async function handleUploadSong() {
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null) {
+    showUploadAlert("请先选择收藏夹");
+    return;
+  }
   if (!selectedUploadFile.value) {
     showUploadAlert("请选择要上传的音乐文件");
     return;
@@ -409,6 +572,7 @@ async function handleUploadSong() {
     const fileBytes = Array.from(new Uint8Array(await selectedUploadFile.value.arrayBuffer()));
 
     await invoke("upload_music", {
+      collectionId,
       fileName: selectedUploadFile.value.name,
       fileBytes,
       musicName: uploadSongDraft.value.title.trim(),
@@ -444,21 +608,85 @@ async function handleUploadSong() {
   }
 }
 
+let trackListRequest = 0;
+
+function clearTracks() {
+  ++playbackRequest;
+  audioRef.value?.pause();
+  audioRef.value?.removeAttribute("src");
+  audioRef.value?.load();
+  tracks.value = [];
+  currentTrackIndex.value = 0;
+  activeTrackIndex.value = 0;
+  currentTime.value = 0;
+  duration.value = 0;
+  isPlaying.value = false;
+  shuffleQueue.value = [];
+}
+
+async function fetchCollections() {
+  const request = ++trackListRequest;
+  isLoadingTracks.value = true;
+  trackLoadError.value = "";
+  clearTracks();
+  collections.value = [];
+  selectedCollectionId.value = null;
+  try {
+    const loaded = await invoke<Collection[]>("fetch_collections");
+    if (request !== trackListRequest) return;
+    collections.value = loaded;
+    selectedCollectionId.value = loaded[0]?.id ?? null;
+    await fetchTracks();
+  } catch (error) {
+    if (request !== trackListRequest) return;
+    console.error("Failed to load collections", error);
+    trackLoadError.value = "收藏夹加载失败，请检查服务器设置后刷新重试。";
+  } finally {
+    if (request === trackListRequest) isLoadingTracks.value = false;
+  }
+}
+
+async function openCollection(collectionId: number) {
+  await flushSettings();
+  const needsRefresh = playlistNeedsRefresh;
+  playlistNeedsRefresh = false;
+  closeSettings();
+  if (needsRefresh) {
+    await fetchCollections();
+    return;
+  }
+  if (selectedCollectionId.value === collectionId) return;
+  selectedCollectionId.value = collectionId;
+  clearTracks();
+  await fetchTracks();
+}
+
+async function refreshPlaylist() {
+  if (!collections.value.length) await fetchCollections();
+  else await fetchTracks();
+}
+
 async function fetchTracks() {
+  const request = ++trackListRequest;
+  const collectionId = selectedCollectionId.value;
+  if (collectionId === null) {
+    clearTracks();
+    isLoadingTracks.value = false;
+    return;
+  }
   isLoadingTracks.value = true;
   trackLoadError.value = "";
   const previousTrackId = currentTrack.value?.id;
 
   try {
-    const loadedTracks = await invoke<Track[]>("fetch_music_list");
+    const loadedTracks = await invoke<Track[]>("fetch_music_list", { collectionId });
+    if (request !== trackListRequest) return;
     tracks.value = loadedTracks;
 
     if (playbackOrder.value === 'shuffle') ensureShuffleQueue();
 
     if (!loadedTracks.length) {
-      currentTrackIndex.value = 0;
-      activeTrackIndex.value = 0;
-      isPlaying.value = false;
+      clearTracks();
       return;
     }
 
@@ -478,36 +706,83 @@ async function fetchTracks() {
     const isSameTrack = previousTrackId != null && nextTrack.id === previousTrackId;
 
     if (!isSameTrack) {
-      applyTrack(nextTrack);
+      await applyTrack(nextTrack);
     }
 
     if (isPlaying.value) {
       await audioRef.value?.play();
     }
   } catch (error) {
+    if (request !== trackListRequest) return;
     console.error("Failed to load music list", error);
-    tracks.value = [];
-    currentTrackIndex.value = 0;
-    activeTrackIndex.value = 0;
-    isPlaying.value = false;
+    clearTracks();
     trackLoadError.value = "音乐列表加载失败，请检查服务器设置。";
   } finally {
-    isLoadingTracks.value = false;
+    if (request === trackListRequest) isLoadingTracks.value = false;
   }
 }
 
-watch(currentTrackIndex, () => {
-  loadTrack();
-  if (isPlaying.value) {
+let stopTrayListener: UnlistenFn | undefined;
+const { theme: trayTheme } = useTheme();
+let trayReady = false;
+let appUnmounted = false;
+let traySyncChain: Promise<unknown> = Promise.resolve();
+function syncTrayState() {
+  if (!trayReady || appUnmounted) return;
+  const state = { playing: isPlaying.value, hasTracks: tracks.value.length > 0,
+    volume: Math.round(volume.value), playbackOrder: playbackOrder.value, theme: trayTheme.value };
+  traySyncChain = traySyncChain.then(() => invoke("sync_tray_state", state))
+    .catch(error => console.error("Failed to synchronize tray menu", error));
+}
+async function handleTrayControl(action: string) {
+  const volumeMatch = /^tray-volume-(\d{1,3})$/.exec(action);
+  if (volumeMatch) { setVolume(Number(volumeMatch[1])); syncTrayState(); return; }
+  switch (action) {
+    case "tray-previous": prevTrack(); break;
+    case "tray-next": nextTrack(); break;
+    case "tray-play-pause": await playPause(); break;
+    case "tray-mute": toggleMute(); break;
+    case "tray-volume-up": setVolume(volume.value + 10); break;
+    case "tray-volume-down": setVolume(volume.value - 10); break;
+    case "tray-volume-0": setVolume(0); break;
+    case "tray-volume-25": setVolume(25); break;
+    case "tray-volume-50": setVolume(50); break;
+    case "tray-volume-75": setVolume(75); break;
+    case "tray-volume-100": setVolume(100); break;
+    case "tray-mode-loop": setPlaybackOrder("loop"); break;
+    case "tray-mode-one": setPlaybackOrder("one"); break;
+    case "tray-mode-shuffle": setPlaybackOrder("shuffle"); break;
+  }
+  syncTrayState();
+}
+watch([isPlaying, volume, playbackOrder, () => tracks.value.length, trayTheme], syncTrayState, { flush: "post" });
+
+watch(currentTrackIndex, async () => {
+  const shouldPlay = isPlaying.value;
+  await loadTrack();
+  if (shouldPlay) {
     void audioRef.value?.play();
   }
 });
 
 onMounted(() => {
+  window.addEventListener("hashchange", syncPage);
   void (async () => {
+    try {
+      const unlisten = await listen<string>("tray-control", ({ payload }) => {
+        void handleTrayControl(payload).catch(error => console.error("Tray control failed", error));
+      });
+      if (appUnmounted) { unlisten(); return; }
+      stopTrayListener = unlisten;
+      trayReady = true;
+      syncTrayState();
+    } catch (error) {
+      console.error("Failed to register tray controls", error);
+    }
     try {
       const loaded = await invoke<AppSettings>("load_settings");
       savedSettings.value = {
+        downloadDirectory: loaded.downloadDirectory || "",
         serverIp: loaded.serverIp || DEFAULT_SETTINGS.serverIp,
         serverPort: loaded.serverPort || DEFAULT_SETTINGS.serverPort,
         volume: loaded.volume ?? DEFAULT_SETTINGS.volume,
@@ -525,7 +800,7 @@ onMounted(() => {
       playbackOrder.value = DEFAULT_SETTINGS.playbackOrder ?? "loop";
     }
 
-    await fetchTracks();
+    await fetchCollections();
   })();
 
   if (!audioRef.value) return;
@@ -553,15 +828,20 @@ onMounted(() => {
       return;
     }
 
-    // for shuffle and loop, advance and play
-    nextTrack();
-    // ensure state indicates playing so watch handlers also trigger play
+    const previousIndex = currentTrackIndex.value;
     isPlaying.value = true;
-    void audioRef.value?.play();
+    nextTrack();
+    if (previousIndex === currentTrackIndex.value) {
+      void applyTrack(currentTrack.value).then(() => audioRef.value?.play());
+    }
   });
 });
 
 onUnmounted(() => {
+  appUnmounted = true;
+  trayReady = false;
+  stopTrayListener?.();
+  window.removeEventListener("hashchange", syncPage);
   if (!audioRef.value) return;
   audioRef.value.pause();
   audioRef.value.src = "";
@@ -588,9 +868,11 @@ onUnmounted(() => {
 
       <div class="content-grid">
         <div class="content-row">
-          <SidebarMenu />
+          <SidebarMenu :active="currentPage === 'playlist'" :collections="collections"
+            :selectedCollectionId="selectedCollectionId" @open-playlist="openCollection" />
           <main class="main-panel">
-            <PlaylistView
+            <SettingsView v-if="currentPage === 'settings'" :initialSettings="savedSettings" :saving="isSavingSettings" @save="saveSettings" @cancel="closeSettings" />
+            <PlaylistView v-else
               :tracks="filteredTracks"
               :activeTrackIndex="activeTrackIndex"
               :currentTrackIndex="currentTrackIndex"
@@ -599,12 +881,37 @@ onUnmounted(() => {
               :loading="isLoadingTracks"
               :errorMessage="trackLoadError"
               :deletingTrackIds="deletingTrackIds"
+              :deleting="isDeletingTracks"
+              :batchDownloading="isBatchDownloading"
+              :downloadProgress="`${batchDownloadProgress.completed} / ${batchDownloadProgress.total}`"
+              :collectionId="selectedCollectionId"
+              @batch-delete="deleteTracks"
+              @batch-download="downloadTracks"
+              :downloadingTrackIds="downloadingTrackIds"
+              :batchUploading="batchProgress.running"
+              :hasUploadProgress="batchProgress.total > 0"
+              :uploadProgressOpen="isUploadProgressOpen"
+              @toggle-upload-progress="isUploadProgressOpen = !isUploadProgressOpen"
+              @download="downloadTrack"
               @select="selectTrack"
               @play="playTrack"
               @delete="deleteTrack"
-              @refresh="fetchTracks"
+              @refresh="refreshPlaylist"
               @upload="openUploadPicker"
-            />
+            >
+              <template #upload-progress>
+    <aside v-if="batchProgress.total && isUploadProgressOpen" id="batch-upload-progress" class="batch-progress" role="status" aria-live="polite">
+      <div>{{ batchProgress.running ? '正在上传' : '上传完成' }} {{ batchProgress.completed }} / {{ batchProgress.total }}
+        <span v-if="batchProgress.failed">（失败 {{ batchProgress.failed }} 首）</span>
+      </div>
+      <progress :value="batchProgress.completed" :max="batchProgress.total"></progress>
+      <div v-if="batchProgress.current">{{ batchProgress.current }}</div>
+      <details v-if="batchProgress.errors.length"><summary>查看失败原因</summary>
+        <p v-for="(error, index) in batchProgress.errors" :key="index">{{ error }}</p>
+      </details>
+    </aside>
+              </template>
+            </PlaylistView>
           </main>
         </div>
         <PlayerFooter
@@ -626,13 +933,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <SettingsDialog
-      :open="isSettingsOpen"
-      :initialSettings="savedSettings"
-      @save="saveSettings"
-      @cancel="closeSettings"
-    />
-
     <UploadSongDialog
       :open="isUploadDialogOpen"
       :draft="uploadSongDraft"
@@ -642,7 +942,12 @@ onUnmounted(() => {
       @fetch-cover="handleFetchCover"
       @upload="handleUploadSong"
       @reselect-file="reselectUploadFile"
+      @batch="openBatchUpload"
     />
+
+    <BatchUploadDialog :open="isBatchDialogOpen" @cancel="isBatchDialogOpen = false"
+      @single="isBatchDialogOpen = false; isUploadDialogOpen = true" @upload="uploadBatch" />
+
 
     <input
       ref="uploadFileInputRef"
@@ -657,6 +962,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.batch-progress {
+
+  max-height: 45vh; overflow: auto; padding: .25rem;
+  background: var(--theme-panel, #fff); color: var(--theme-text, #334155);
+
+  font-size: .85rem; overflow-wrap: anywhere;
+  -webkit-app-region: no-drag;
+}
+.batch-progress progress { width: 100%; margin: .6rem 0; accent-color: #818cf8; }
 .app-shell {
   position: fixed;
   top: 0;
@@ -735,8 +1049,8 @@ onUnmounted(() => {
 }
 
 .titlebar-right {
-  width: 6.3rem;
-  flex: 0 0 6.3rem;
+  width: 10.5rem;
+  flex: 0 0 10.5rem;
   display: flex;
   justify-content: flex-end;
   -webkit-app-region: no-drag;

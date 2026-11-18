@@ -1,8 +1,17 @@
-﻿<template>
+﻿<script setup lang="ts">
+import type { Collection } from "../types/music";
+
+defineProps<{ active: boolean; collections: Collection[]; selectedCollectionId: number | null }>();
+const emit = defineEmits<{ (event: "open-playlist", collectionId: number): void }>();
+</script>
+
+<template>
   <aside class="sidebar">
     <div class="playlist-group">
       <p class="eyebrow">收藏夹</p>
-      <button class="playlist-item active">默认收藏夹</button>
+      <button v-for="collection in collections" :key="collection.id" class="playlist-item"
+        :class="{ active: active && selectedCollectionId === collection.id }"
+        @click="emit('open-playlist', collection.id)">{{ collection.collectionName }}</button>
     </div>
   </aside>
 </template>

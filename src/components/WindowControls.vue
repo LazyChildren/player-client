@@ -2,12 +2,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, type Window as TauriWindow } from "@tauri-apps/api/window";
 import { onMounted, onUnmounted, ref } from "vue";
+import { useTheme } from "../utils/theme";
 import type { AppSettings } from "../types/music";
 
 const emit = defineEmits<{
   (event: "open-settings"): void;
 }>();
 
+const { theme, toggleTheme } = useTheme();
 const isMaximized = ref(false);
 let windowHandle: TauriWindow | null = null;
 let unlistenWindowEvents: Array<() => void> = [];
@@ -111,6 +113,19 @@ async function closeWindow() {
 
 <template>
   <div class="window-controls">
+    <button
+      class="window-button theme-button"
+      type="button"
+      :title="theme === 'dark' ? '切换浅色主题' : '切换深色主题'"
+      :aria-label="theme === 'dark' ? '切换浅色主题' : '切换深色主题'"
+      :aria-pressed="theme === 'dark'"
+      @click="toggleTheme"
+    >
+      <svg viewBox="0 0 1024 1024" width="24" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path v-if="theme === 'light'" d="M539.9552 225.28c33.4848 0 39.936 45.568 18.944 71.68a204.8 204.8 0 0 0 159.744 332.8c34.2016 0 66.6624 33.792 45.3632 60.6208A285.2864 285.2864 0 0 1 539.9552 798.72a286.72 286.72 0 1 1 0-573.44z" fill="currentColor" />
+        <path v-else d="M512 706.56c22.528 0 40.96 18.432 40.96 40.96v40.96a40.96 40.96 0 0 1-81.92 0v-40.96a40.96 40.96 0 0 1 40.96-40.96z m-195.584-57.0368a40.96 40.96 0 0 1 58.0608 57.9584l-28.9792 28.9792a40.96 40.96 0 1 1-57.9584-58.0608l28.8768-28.8768z m333.1072 0a40.96 40.96 0 0 1 57.9584 0l28.9792 28.8768a40.96 40.96 0 0 1-57.9584 58.0608l-28.9792-28.9792a40.96 40.96 0 0 1 0-57.9584zM511.7952 388.8128a122.88 122.88 0 1 1-0.1024 245.8624 122.88 122.88 0 0 1 0-245.76zM276.48 471.04a40.96 40.96 0 1 1 0 81.92h-40.96a40.96 40.96 0 0 1 0-81.92h40.96z m512 0a40.96 40.96 0 1 1 0 81.92h-40.96a40.96 40.96 0 0 1 0-81.92h40.96zM287.5392 287.4368a40.96 40.96 0 0 1 57.9584 0l28.9792 28.9792a40.96 40.96 0 0 1-58.0608 57.9584l-28.8768-28.8768a40.96 40.96 0 0 1 0-58.0608z m390.9632 0a40.96 40.96 0 0 1 57.9584 58.0608l-28.9792 28.8768a40.96 40.96 0 1 1-57.9584-57.9584l28.9792-28.9792zM512 194.56c22.528 0 40.96 18.432 40.96 40.96v40.96a40.96 40.96 0 0 1-81.92 0v-40.96a40.96 40.96 0 0 1 40.96-40.96z" fill="currentColor" />
+      </svg>
+    </button>
     <button
       class="window-button"
       type="button"
